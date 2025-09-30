@@ -419,25 +419,25 @@ export default function ReportsPage() {
   useEffect(() => {
     loadCurrentUser();
     loadAvailableYears();
-  }, []);
+  }, [loadCurrentUser, loadAvailableYears]);
 
   useEffect(() => {
     if (currentUser !== null) {
       loadRegisteredVehicles();
     }
-  }, [currentUser, userVehicle]);
+  }, [currentUser, userVehicle, loadRegisteredVehicles]);
 
   useEffect(() => {
     if (registeredVehicles.length >= 0 && selectedYear && currentUser !== null) {
       loadDrivingRecords();
     }
-  }, [registeredVehicles, selectedYear, currentUser, userVehicle]);
+  }, [registeredVehicles, selectedYear, currentUser, userVehicle, loadDrivingRecords]);
 
   useEffect(() => {
     if (registeredVehicles.length > 0) {
       calculateVehicleStats();
     }
-  }, [registeredVehicles, drivingRecords]);
+  }, [registeredVehicles, drivingRecords, calculateVehicleStats]);
 
   if (isLoading) {
     return (

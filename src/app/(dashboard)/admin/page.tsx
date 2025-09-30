@@ -31,6 +31,7 @@ interface Driver {
 }
 
 interface Department {
+  id: number;
   name: string;
   count: number;
 }
@@ -63,9 +64,8 @@ export default function AdminPage() {
 
   // 현재 사용자가 마스터 관리자인지 확인하는 함수
   const isMasterAdmin = (user: SupabaseUser | null) => {
-    return user?.email === 'master@korea.kr' || 
-           user?.user_metadata?.role === 'master_admin' ||
-           user?.raw_user_meta_data?.role === 'master_admin';
+    return user?.email === 'master@korea.kr' ||
+           user?.user_metadata?.role === 'master_admin';
   };
 
 
@@ -97,7 +97,7 @@ export default function AdminPage() {
 
       // drivers 테이블에 사용자가 없어도 auth 메타데이터로 권한 확인 가능
       let driverRole = null;
-      if (error && error.code === 'PGRST116') {
+      if (error && 'code' in error && error.code === 'PGRST116') {
         driverRole = null; // drivers 테이블에 없음
       } else if (error) {
         setError(`사용자 정보 조회 중 오류 발생: ${error.message}`);
@@ -174,10 +174,10 @@ export default function AdminPage() {
       setRegisteredUsers(data || []);
       
       // 사용자 통계 계산
-      const masterAdminUsers = data?.filter(user => user.role === 'master_admin') || [];
-      const adminUsers = data?.filter(user => user.role === 'admin') || [];
-      const regularUsers = data?.filter(user => user.role === 'user') || [];
-      const pendingAdminUsers = data?.filter(user => user.role === 'pending_admin') || [];
+      const masterAdminUsers = data?.filter((user: Driver) => user.role === 'master_admin') || [];
+      const adminUsers = data?.filter((user: Driver) => user.role === 'admin') || [];
+      const regularUsers = data?.filter((user: Driver) => user.role === 'user') || [];
+      const pendingAdminUsers = data?.filter((user: Driver) => user.role === 'pending_admin') || [];
       
       const stats = {
         masterAdmin: masterAdminUsers.length,
@@ -189,8 +189,8 @@ export default function AdminPage() {
       setUserStats(stats);
       
       // 부서별 통계 계산
-      const deptStats = {};
-      data?.forEach(user => {
+      const deptStats: { [key: string]: number } = {};
+      data?.forEach((user: Driver) => {
         if (user.department) {
           const dept = user.department.trim();
           deptStats[dept] = (deptStats[dept] || 0) + 1;
@@ -200,7 +200,7 @@ export default function AdminPage() {
       const departmentList = Object.entries(deptStats).map(([name, count], index) => ({
         id: index + 1,
         name,
-        userCount: count
+        count
       }));
       setDepartments(departmentList);
       
@@ -449,7 +449,7 @@ export default function AdminPage() {
           setError("권한을 선택해주세요.");
           return;
         }
-        updateData.role = targetRole;
+        updateData.role = targetRole as "user" | "admin" | "master_admin" | "pending_admin";
       }
 
       const { data: updateResult, error: updateError } = await supabase
@@ -676,7 +676,7 @@ export default function AdminPage() {
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{dept.userCount}명</Badge>
+                      <Badge variant="secondary">{dept.count}명</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
