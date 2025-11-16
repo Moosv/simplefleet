@@ -38,21 +38,11 @@ export default function LoginPage() {
           .not('department', 'is', null)
           .not('department', 'eq', '');
 
-        console.log('Departments query result:', { data, error });
-
-        // 모든 사용자 정보도 로그로 출력 (디버깅용)
-        const { data: allUsers } = await supabase
-          .from('drivers')
-          .select('name, department, main_vehicle_number');
-        console.log('All users in database for debugging:', allUsers);
-
         if (!error && data) {
           // 중복 제거하여 부서 목록 생성
           const uniqueDepartments = [...new Set(data.map(item => item.department))].sort();
-          console.log('Unique departments:', uniqueDepartments);
           setDepartments(uniqueDepartments);
         } else {
-          console.error('Error loading departments:', error);
           // RLS로 인해 실패할 경우 하드코딩된 부서 목록 사용
           setDepartments(['산림특용자원연구과']);
         }
@@ -93,8 +83,6 @@ export default function LoginPage() {
     }
 
     try {
-      console.log('Attempting login with:', userName.trim(), userDepartment);
-      
       // 클라이언트에서 직접 사용자 검증 (역할 상관없이 이름+부서로 검증)
       const { data: driverData, error } = await supabase
         .from('drivers')
@@ -103,10 +91,7 @@ export default function LoginPage() {
         .eq('department', userDepartment)
         .single();
 
-      console.log('Driver query result:', { driverData, error });
-
       if (error || !driverData) {
-        console.log('Login failed: no matching driver found');
         if (error?.code === 'PGRST116') {
           setError("입력한 이름과 소속 부서 정보가 등록된 정보와 일치하지 않습니다. 관리자에게 문의하세요.");
         } else if (error?.message?.includes('RLS')) {
@@ -117,9 +102,6 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-
-      console.log('Login successful, saving to localStorage');
-      console.log('User data from database:', driverData);
       
       // 검증 성공 - 사용자 정보를 로컬 스토리지에 저장 (항상 일반 사용자 모드로)
       const userData = {
@@ -135,30 +117,17 @@ export default function LoginPage() {
       };
       
       localStorage.setItem('simplefleet_user', JSON.stringify(userData));
-      console.log('Stored user data:', userData);
-      
-      // localStorage가 제대로 저장되었는지 재확인
-      const storedData = localStorage.getItem('simplefleet_user');
-      console.log('Verification - stored data in localStorage:', storedData);
-      
-      console.log('Redirecting to /records/new');
-      
-      // 로그인 성공 처리
-      console.log('🚀 LOGIN SUCCESS - REDIRECTING NOW');
       setError("");
       setLoading(false);
       
       // 강력한 리다이렉트 (여러 방법 동시 시도)
-      console.log('🚀 Method 1: window.location.replace');
       window.location.replace("/records/new");
       
       setTimeout(() => {
-        console.log('🚀 Method 2: window.location.href (backup)');
         window.location.href = "/records/new";
       }, 200);
       
       setTimeout(() => {
-        console.log('🚀 Method 3: router.push (backup)');
         router.push("/records/new");
       }, 500);
       

@@ -49,19 +49,13 @@ export default function NewRecordPage() {
   useEffect(() => {
     const loadUserInfo = async () => {
       try {
-        console.log('🔍 Records page: Starting user info load');
-        
         // 먼저 일반 사용자 로그인 확인
         const simpleUser = localStorage.getItem('simplefleet_user');
-        console.log('🔍 Records page: Simple user data from localStorage:', simpleUser);
         
         if (simpleUser) {
           const userData = JSON.parse(simpleUser);
-          console.log('🔍 Records page: Parsed user data:', userData);
           
           if (userData.type === 'user') {
-            console.log('✅ Records page: Simple user login detected, loading user info');
-            
             // 일반 사용자의 경우 저장된 정보 사용
             const userInfo = {
               vehicleNumber: userData.vehicleNumber || "미설정",
@@ -70,8 +64,6 @@ export default function NewRecordPage() {
               availableVehicles: userData.vehicleNumber && userData.vehicleNumber !== "미설정" ? [userData.vehicleNumber] : []
             };
             
-            console.log('✅ Records page: User info set:', userInfo);
-            
             setUserInfo(userInfo);
             setFormData(prev => ({
               ...prev,
@@ -79,8 +71,6 @@ export default function NewRecordPage() {
               department: userInfo.department,
               driverName: userInfo.name,
             }));
-            
-            console.log('✅ Records page: Simple user setup complete, returning early');
             return;
           }
         }
@@ -124,13 +114,11 @@ export default function NewRecordPage() {
           }
         } else {
           // 일반 사용자 로그인도 없는 경우에만 로그인 페이지로 리다이렉트
-          console.log('❌ Records page: No Supabase auth and no simple user login - redirecting to login');
           router.push('/auth/login');
         }
       } catch (err) {
         console.error('❌ Records page: Error loading user info:', err);
         // 에러 발생시 로그인 페이지로 리다이렉트
-        console.log('❌ Records page: Redirecting to login due to error');
         router.push('/auth/login');
       }
     };

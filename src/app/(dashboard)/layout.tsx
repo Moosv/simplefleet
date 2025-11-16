@@ -18,28 +18,18 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('🔍 Layout: Checking authentication...');
-      
       // 먼저 Supabase 인증 확인 (관리자 우선)
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-      console.log('🔍 Layout: Supabase user:', supabaseUser?.email);
       
       if (supabaseUser) {
-        console.log('✅ Layout: Supabase user detected');
-        console.log('🔍 Layout: User metadata:', supabaseUser.user_metadata);
-        console.log('🔍 Layout: Raw user metadata:', supabaseUser.raw_user_meta_data);
-        
         // 관리자 로그인이면 간편 로그인 데이터 제거
         const isAdmin = supabaseUser.email === 'master@korea.kr' || 
                        supabaseUser.user_metadata?.role === 'admin' || 
                        supabaseUser.user_metadata?.role === 'master_admin' ||
                        supabaseUser.raw_user_meta_data?.role === 'admin' ||
                        supabaseUser.raw_user_meta_data?.role === 'master_admin';
-        
-        console.log('🔍 Layout: isAdmin check result:', isAdmin);
-        
+
         if (isAdmin) {
-          console.log('🧹 Layout: Admin login detected, clearing simple user data');
           localStorage.removeItem('simplefleet_user');
         }
         setUser(supabaseUser);
@@ -49,12 +39,10 @@ export default function DashboardLayout({
 
       // 간편 로그인 확인 (Supabase 인증이 없을 때만)
       const simpleUser = localStorage.getItem('simplefleet_user');
-      console.log('🔍 Layout: Simple user data:', simpleUser);
       
       if (simpleUser) {
         const userData = JSON.parse(simpleUser);
         if (userData.type === 'user') {
-          console.log('✅ Layout: Simple user detected, allowing access');
           // 간편 로그인 사용자를 위한 mock user 생성
           const mockUser = {
             id: userData.user_id || 'simple-user-id',
@@ -70,7 +58,6 @@ export default function DashboardLayout({
         }
       }
 
-      console.log('❌ Layout: No auth found, redirecting to login');
       router.push('/auth/login');
       setIsLoading(false);
     };

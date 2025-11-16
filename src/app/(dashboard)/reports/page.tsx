@@ -22,16 +22,37 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface VehicleData {
+  vehicleNumber: string;
+  department: string;
+  driverName?: string;
+  totalDistance: number;
+  totalTrips: number;
+  totalFuel: number;
+}
+
+interface UserData {
+  vehicleNumber: string;
+}
+
+interface SimpleUser {
+  type: string;
+  name?: string;
+  vehicleNumber?: string;
+  email?: string;
+  role?: string;
+}
+
 export default function ReportsPage() {
   const [selectedVehicle, setSelectedVehicle] = useState("all");
   const [selectedYear, setSelectedYear] = useState("2024");
-  const [vehicleData, setVehicleData] = useState([]);
+  const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
   const [registeredVehicles, setRegisteredVehicles] = useState([]);
   const [drivingRecords, setDrivingRecords] = useState([]);
-  const [availableYears, setAvailableYears] = useState([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<SimpleUser | null>(null);
   const [userVehicle, setUserVehicle] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -53,7 +74,6 @@ export default function ReportsPage() {
       if (simpleUser) {
         const userData = JSON.parse(simpleUser);
         if (userData.type === 'user') {
-          console.log('📊 Reports: Simple user detected', userData);
           setCurrentUser({
             type: 'simple_user',
             name: userData.name,
@@ -67,8 +87,6 @@ export default function ReportsPage() {
       // Supabase 인증 사용자 확인
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        console.log('📊 Reports: Supabase user detected', user.email);
-        
         // 관리자 권한 확인 (raw_user_meta_data도 체크)
         const adminCheck = user.email === 'master@korea.kr' ||
                           user.user_metadata?.role === 'admin' || 
@@ -78,7 +96,6 @@ export default function ReportsPage() {
                           user.email?.includes('admin');
         
         setIsAdmin(adminCheck);
-        console.log('📊 Reports: Admin check result:', adminCheck);
         
         if (adminCheck) {
           setCurrentUser({
@@ -124,13 +141,17 @@ export default function ReportsPage() {
       }
 
       // 중복 제거 및 차량별 그룹핑
-      let uniqueVehicles = data.reduce((acc, curr) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let uniqueVehicles = data.reduce((acc: VehicleData[], curr: any) => {
         const vehicle = curr.main_vehicle_number;
         if (!acc.find(v => v.vehicleNumber === vehicle)) {
           acc.push({
             vehicleNumber: vehicle,
             department: curr.department || '미설정',
-            driverName: curr.name
+            driverName: curr.name,
+            totalDistance: 0,
+            totalTrips: 0,
+            totalFuel: 0
           });
         }
         return acc;
@@ -139,17 +160,15 @@ export default function ReportsPage() {
       // 일반 사용자의 경우 본인 차량만 필터링
       if (currentUser && (currentUser.type === 'simple_user' || currentUser.type === 'regular_user')) {
         if (userVehicle && userVehicle !== '미설정') {
-          uniqueVehicles = uniqueVehicles.filter(v => v.vehicleNumber === userVehicle);
-          console.log('📊 Filtered vehicles for regular user:', uniqueVehicles);
-          
-          // 일반 사용자의 경우 자동으로 본인 차량 선택
-          if (uniqueVehicles.length > 0) {
+          uniqueVehicles = uniqueVehicles.filter((v: VehicleData) => v.vehicleNumber === userVehicle);
+
+          // 일반 사용자의 경우 자동으로 본인 차량 선택 (한 번만)
+          if (uniqueVehicles.length > 0 && selectedVehicle === 'all') {
             setSelectedVehicle(uniqueVehicles[0].vehicleNumber);
           }
         } else {
           // 차량이 미설정인 경우 빈 배열
           uniqueVehicles = [];
-          console.log('📊 No vehicle assigned to user');
         }
       }
 
@@ -177,9 +196,10 @@ export default function ReportsPage() {
 
       if (data && data.length > 0) {
         // 운행 기록에서 연도 추출 및 중복 제거
-        const years = [...new Set(
-          data.map(record => new Date(record.start_date).getFullYear().toString())
-        )].sort((a, b) => parseInt(b) - parseInt(a)); // 최신 연도부터 정렬
+        const years = ([...new Set(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.map((record: any) => new Date(record.start_date).getFullYear().toString())
+        )] as string[]).sort((a, b) => parseInt(b) - parseInt(a)); // 최신 연도부터 정렬
 
         setAvailableYears(years);
         
@@ -214,7 +234,6 @@ export default function ReportsPage() {
       if (currentUser && (currentUser.type === 'simple_user' || currentUser.type === 'regular_user')) {
         if (userVehicle && userVehicle !== '미설정') {
           query = query.eq('vehicle_number', userVehicle);
-          console.log('📊 Filtering records for user vehicle:', userVehicle);
         } else {
           // 차량이 미설정인 경우 빈 결과 반환
           setDrivingRecords([]);
@@ -239,7 +258,7 @@ export default function ReportsPage() {
   };
 
   // 시간 차이 계산 함수
-  const calculateTimeDifference = (startDate, startTime, endDate, endTime) => {
+  const calculateTimeDifference = (startDate: string, startTime: string, endDate: string, endTime: string) => {
     if (!startDate || !endDate) return '-';
     
     const start = new Date(`${startDate}T${startTime || '00:00'}:00`);
@@ -263,11 +282,12 @@ export default function ReportsPage() {
   };
 
   // 주행거리 계산 함수 (간단한 추정)
-  const calculateTripDistance = (record, allRecords) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const calculateTripDistance = (record: any, allRecords: any[]) => {
     // 같은 차량의 이전 기록과 비교하여 주행거리 추정
     const sameVehicleRecords = allRecords
       .filter(r => r.vehicle_number === record.vehicle_number)
-      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     
     const currentIndex = sameVehicleRecords.findIndex(r => r.id === record.id);
     
@@ -282,7 +302,8 @@ export default function ReportsPage() {
 
   // 차량별 통계 계산
   // 수정 기능
-  const handleEditRecord = (record) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditRecord = (record: any) => {
     setEditingRecord(record);
     setEditFormData({
       startDate: record.start_date,

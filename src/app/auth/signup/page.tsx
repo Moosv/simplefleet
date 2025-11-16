@@ -88,10 +88,8 @@ export default function SignupPage() {
         } else {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            console.log('🔄 Adding user to drivers table:', { user_id: user.id, name: name.trim(), email: email, department: department.trim() });
-            
             // drivers 테이블에 사용자 정보 추가 (모든 사용자)
-            const { data: driverData, error: driverError } = await supabase
+            const { error: driverError } = await supabase
               .from('drivers')
               .insert([{
                 user_id: user.id,
@@ -100,21 +98,18 @@ export default function SignupPage() {
                 department: department.trim(), // 회원가입 시 입력한 부서명
                 main_vehicle_number: '', // 관리자가 나중에 설정
                 role: isAdmin ? 'pending_admin' : 'user'
-              }])
-              .select();
+              }]);
 
             if (driverError) {
               console.error('❌ Error adding user to drivers table:', driverError);
               setError(`사용자 정보 저장 실패: ${driverError.message}`);
               return;
-            } else {
-              console.log('✅ User added to drivers table:', driverData);
             }
 
             // 관리자 신청인 경우 admin_requests 테이블에 요청 추가
             if (isAdmin) {
               try {
-                const { data: requestData, error: requestError } = await supabase
+                const { error: requestError } = await supabase
                   .from('admin_requests')
                   .insert([{
                     user_id: user.id,
@@ -122,18 +117,18 @@ export default function SignupPage() {
                     email: email,
                     department: department.trim(),
                     status: 'pending'
-                  }])
-                  .select();
+                  }]);
 
                 if (requestError) {
                   console.error('❌ Error adding admin request:', requestError);
-                  console.log('⚠️ Admin request table may not exist - continuing without admin request');
                 } else {
-                  console.log('✅ Admin request added:', requestData);
+                  await supabase
+                    .from('drivers')
+                    .update({ role: 'pending_admin' })
+                    .eq('user_id', user.id);
                 }
               } catch (err) {
                 console.error('❌ Admin request error:', err);
-                console.log('⚠️ Continuing without admin request functionality');
               }
             }
           }

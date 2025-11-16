@@ -119,7 +119,6 @@ export default function RecordsPage() {
 
   const handleExport = () => {
     // TODO: Excel 내보내기 로직 구현
-    console.log("Exporting to Excel...");
   };
 
   return (

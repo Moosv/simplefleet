@@ -3,16 +3,8 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // 환경 변수 확인
-    console.log('Environment check:', {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'EXISTS' : 'MISSING'
-    });
-
     const supabase = await createClient();
-    
-    console.log('Supabase client:', typeof supabase, 'has from:', typeof supabase.from);
-    
+
     // 서버에서 관리자 권한으로 부서 목록 조회
     const { data, error } = await supabase
       .from('drivers')
