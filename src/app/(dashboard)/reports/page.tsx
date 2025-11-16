@@ -24,8 +24,9 @@ import { Label } from "@/components/ui/label";
 
 interface VehicleData {
   vehicleNumber: string;
-  department: string;
+  department?: string;
   driverName?: string;
+  monthlyDistance?: number[];
   totalDistance: number;
   totalTrips: number;
   totalFuel: number;
@@ -43,23 +44,59 @@ interface SimpleUser {
   role?: string;
 }
 
+interface EditFormData {
+  startDate?: string;
+  startTime?: string;
+  endDate?: string;
+  endTime?: string;
+  vehicleNumber?: string;
+  department?: string;
+  driverName?: string;
+  purpose?: string;
+  destination?: string;
+  waypoint?: string;
+  cumulativeDistance?: string;
+  fuelAmount?: string;
+}
+
+interface DrivingRecord {
+  id: string;
+  start_date: string;
+  start_time?: string;
+  end_date: string;
+  end_time?: string;
+  vehicle_number: string;
+  department?: string;
+  driver_name: string;
+  purpose: string;
+  destination: string;
+  waypoint?: string;
+  cumulative_distance?: number;
+  fuel_amount?: number;
+}
+
+interface RegisteredVehicle {
+  vehicleNumber: string;
+  department?: string;
+}
+
 export default function ReportsPage() {
   const [selectedVehicle, setSelectedVehicle] = useState("all");
   const [selectedYear, setSelectedYear] = useState("2024");
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
-  const [registeredVehicles, setRegisteredVehicles] = useState([]);
-  const [drivingRecords, setDrivingRecords] = useState([]);
+  const [registeredVehicles, setRegisteredVehicles] = useState<RegisteredVehicle[]>([]);
+  const [drivingRecords, setDrivingRecords] = useState<DrivingRecord[]>([]);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState<SimpleUser | null>(null);
   const [userVehicle, setUserVehicle] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [editingRecord, setEditingRecord] = useState(null);
+  const [editingRecord, setEditingRecord] = useState<DrivingRecord | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [recordToDelete, setRecordToDelete] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [recordToDelete, setRecordToDelete] = useState<DrivingRecord | null>(null);
+  const [editFormData, setEditFormData] = useState<EditFormData>({});
   const supabase = createClient();
   
   const selectedVehicleData = selectedVehicle === "all" 
@@ -258,7 +295,7 @@ export default function ReportsPage() {
   };
 
   // 시간 차이 계산 함수
-  const calculateTimeDifference = (startDate: string, startTime: string, endDate: string, endTime: string) => {
+  const calculateTimeDifference = (startDate: string, startTime?: string, endDate?: string, endTime?: string) => {
     if (!startDate || !endDate) return '-';
     
     const start = new Date(`${startDate}T${startTime || '00:00'}:00`);
@@ -363,7 +400,7 @@ export default function ReportsPage() {
   };
 
   // 삭제 기능
-  const handleDeleteRecord = (record) => {
+  const handleDeleteRecord = (record: DrivingRecord) => {
     setRecordToDelete(record);
     setIsDeleteDialogOpen(true);
   };
@@ -416,7 +453,7 @@ export default function ReportsPage() {
       // 총 거리 (누적 주행거리의 최대값 - 최소값으로 추정)
       const distances = vehicleRecords
         .map(r => r.cumulative_distance)
-        .filter(d => d > 0)
+        .filter((d): d is number => d !== undefined && d > 0)
         .sort((a, b) => a - b);
       
       const totalDistance = distances.length > 1 

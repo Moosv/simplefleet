@@ -26,12 +26,10 @@ interface NavigationItem {
 
 const getNavigationItems = (user: User): NavigationItem[] => {
   const isAdmin = user.email === 'master@korea.kr' ||
-                  user.user_metadata?.role === 'admin' || 
+                  user.user_metadata?.role === 'admin' ||
                   user.user_metadata?.role === 'master_admin' ||
-                  user.email?.includes('admin') || 
-                  user.email?.includes('master') ||
-                  user.raw_user_meta_data?.role === 'admin' ||
-                  user.raw_user_meta_data?.role === 'master_admin';
+                  user.email?.includes('admin') ||
+                  user.email?.includes('master');
   
   if (isAdmin) {
     return [
@@ -79,12 +77,10 @@ export function Navigation({ user }: NavigationProps) {
   
   const navigationItems = getNavigationItems(user);
   const isAdmin = user.email === 'master@korea.kr' ||
-                  user.user_metadata?.role === 'admin' || 
+                  user.user_metadata?.role === 'admin' ||
                   user.user_metadata?.role === 'master_admin' ||
-                  user.email?.includes('admin') || 
-                  user.email?.includes('master') ||
-                  user.raw_user_meta_data?.role === 'admin' ||
-                  user.raw_user_meta_data?.role === 'master_admin';
+                  user.email?.includes('admin') ||
+                  user.email?.includes('master');
 
   const handleLogout = async () => {
     // 간편 로그인 데이터 제거

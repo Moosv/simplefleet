@@ -21,7 +21,7 @@ export async function GET() {
     }
 
     // 중복 제거하여 부서 목록 생성
-    const uniqueDepartments = [...new Set(data.map(item => item.department))].sort();
+    const uniqueDepartments = [...new Set(data.map((item: { department: string }) => item.department))].sort();
     
     return NextResponse.json({
       success: true,

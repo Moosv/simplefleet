@@ -40,7 +40,7 @@ export default function LoginPage() {
 
         if (!error && data) {
           // 중복 제거하여 부서 목록 생성
-          const uniqueDepartments = [...new Set(data.map(item => item.department))].sort();
+          const uniqueDepartments = [...new Set(data.map((item: { department: string }) => item.department))].sort() as string[];
           setDepartments(uniqueDepartments);
         } else {
           // RLS로 인해 실패할 경우 하드코딩된 부서 목록 사용
