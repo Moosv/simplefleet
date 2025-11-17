@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
+  const [customDepartment, setCustomDepartment] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -47,7 +49,10 @@ export default function SignupPage() {
       return;
     }
 
-    if (!department.trim()) {
+    // 부서명 검증 (기타 선택 시 커스텀 입력 필요)
+    const finalDepartment = department === "기타" ? customDepartment : department;
+
+    if (!finalDepartment.trim()) {
       setError("부서명을 입력해주세요.");
       setLoading(false);
       return;
@@ -95,7 +100,7 @@ export default function SignupPage() {
                 user_id: user.id,
                 name: name.trim(),
                 email: email,
-                department: department.trim(), // 회원가입 시 입력한 부서명
+                department: finalDepartment.trim(), // 선택하거나 입력한 부서명
                 main_vehicle_number: '', // 관리자가 나중에 설정
                 role: isAdmin ? 'pending_admin' : 'user'
               }]);
@@ -115,7 +120,7 @@ export default function SignupPage() {
                     user_id: user.id,
                     name: name.trim(),
                     email: email,
-                    department: department.trim(),
+                    department: finalDepartment.trim(),
                     status: 'pending'
                   }]);
 
@@ -228,14 +233,26 @@ export default function SignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="department">부서명</Label>
-                <Input
-                  id="department"
-                  type="text"
-                  placeholder="소속 부서를 입력하세요"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  required
-                />
+                <Select value={department} onValueChange={setDepartment} required>
+                  <SelectTrigger id="department">
+                    <SelectValue placeholder="소속 부서를 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="산림특용자원연구과">산림특용자원연구과</SelectItem>
+                    <SelectItem value="기타">기타 (직접 입력)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {department === "기타" && (
+                  <div className="mt-2">
+                    <Input
+                      type="text"
+                      placeholder="부서명을 직접 입력하세요"
+                      value={customDepartment}
+                      onChange={(e) => setCustomDepartment(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Admin Role Checkbox */}
