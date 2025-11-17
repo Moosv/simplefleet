@@ -303,25 +303,47 @@ export default function AdminPage() {
   // 사용자 삭제 함수
   const handleDeleteUser = async (user: Driver) => {
     setIsLoading(true);
+    setError("");
+
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      // 마스터 계정 특별 처리 및 관리자 권한 체크
-      const isMasterEmail = currentUser?.email === 'master@korea.kr';
-      const hasAdminRole = ['admin', 'master_admin'].includes(currentUser?.user_metadata?.role);
-      const isAdminEmail = currentUser?.email?.includes('admin');
-      
-      if (!currentUser || !(isMasterEmail || hasAdminRole || isAdminEmail)) {
-        setError("권한이 없습니다.");
+
+      if (!currentUser) {
+        setError("로그인이 필요합니다.");
         return;
       }
 
-      // 마스터 관리자는 마스터 관리자만 삭제 가능
-      const isMasterUser = isMasterEmail || currentUser.user_metadata?.role === 'master_admin';
-      if (user.role === 'master_admin' && !isMasterUser) {
-        setError("마스터 관리자는 다른 마스터 관리자만 삭제할 수 있습니다.");
+      // 현재 사용자 권한 확인
+      const isMasterAdmin = currentUser.email === 'master@korea.kr' ||
+                           currentUser.user_metadata?.role === 'master_admin';
+      const isAdmin = currentUser.user_metadata?.role === 'admin' ||
+                     currentUser.email?.includes('admin');
+
+      // 권한 체크: 최소한 관리자여야 함
+      if (!isMasterAdmin && !isAdmin) {
+        setError("권한이 없습니다. 관리자만 사용자를 삭제할 수 있습니다.");
         return;
       }
+
+      // 삭제 대상 권한 체크
+      const targetIsMasterAdmin = user.role === 'master_admin';
+      const targetIsAdmin = user.role === 'admin';
+
+      // 권한별 삭제 가능 여부 체크
+      if (targetIsMasterAdmin) {
+        // 마스터 관리자는 마스터 관리자만 삭제 가능
+        if (!isMasterAdmin) {
+          setError("마스터 관리자는 다른 마스터 관리자만 삭제할 수 있습니다.");
+          return;
+        }
+      } else if (targetIsAdmin) {
+        // 일반 관리자는 마스터 관리자만 삭제 가능
+        if (!isMasterAdmin) {
+          setError("일반 관리자는 다른 관리자를 삭제할 수 없습니다.");
+          return;
+        }
+      }
+      // 일반 사용자는 관리자 이상이면 모두 삭제 가능
 
       // 완전한 사용자 삭제 (auth.users와 drivers 테이블 모두에서 삭제)
       const { error: deleteError } = await supabase.rpc('delete_user_completely', {
@@ -329,24 +351,20 @@ export default function AdminPage() {
       });
 
       if (deleteError) {
-        // 완전 삭제 실패 시 소프트 삭제 시도
-        const { error: softDeleteError } = await supabase.rpc('soft_delete_user', {
-          target_user_id: user.user_id
-        });
-        
-        if (softDeleteError) {
-          setError(`사용자 삭제에 실패했습니다: ${softDeleteError.message}`);
-          return;
-        }
-        
-        setError("사용자가 비활성화되었습니다. 로그인은 차단되지만 계정 정보는 보존됩니다.");
-      } else {
-        setError("");
+        console.error('Delete error:', deleteError);
+        setError(`사용자 삭제에 실패했습니다: ${deleteError.message}`);
+        return;
       }
+
+      // 성공 메시지 및 목록 새로고침
+      setError("");
+      alert(`${user.name} 사용자가 삭제되었습니다.`);
 
       // 목록 새로고침
       await loadRegisteredUsers();
-    } catch (_) {
+
+    } catch (error) {
+      console.error('Delete user error:', error);
       setError("사용자 삭제 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
@@ -917,43 +935,72 @@ export default function AdminPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {/* 마스터 관리자는 마스터 관리자만 삭제 가능 */}
-                      {(user.role !== 'master_admin' || currentUser?.email === 'master@korea.kr' || currentUser?.user_metadata?.role === 'master_admin') ? (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>사용자 삭제</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              정말로 &quot;{user.name}&quot; 사용자를 삭제하시겠습니까?
-                              관련된 모든 운행 기록도 함께 삭제됩니다.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>취소</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => handleDeleteUser(user)}
-                              className="bg-red-600 hover:bg-red-700"
-                              disabled={isLoading}
-                            >
-                              {isLoading ? "삭제 중..." : "삭제"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                      ) : (
-                        <div className="flex items-center justify-center h-8 w-8 text-gray-400">
-                          <span className="text-xs">보호됨</span>
-                        </div>
-                      )}
+                      {(() => {
+                        // 현재 사용자 권한 확인
+                        const isMasterAdmin = !!(currentUser?.email === 'master@korea.kr' ||
+                                             currentUser?.user_metadata?.role === 'master_admin');
+                        const isAdmin = !!(currentUser?.user_metadata?.role === 'admin' ||
+                                       currentUser?.email?.includes('admin'));
+
+                        // 삭제 대상 권한 확인
+                        const targetIsMasterAdmin = user.role === 'master_admin';
+                        const targetIsAdmin = user.role === 'admin';
+
+                        // 삭제 가능 여부 판단
+                        let canDelete: boolean = false;
+                        let disabledReason = '';
+
+                        if (targetIsMasterAdmin) {
+                          // 마스터 관리자는 마스터 관리자만 삭제 가능
+                          canDelete = isMasterAdmin;
+                          disabledReason = '마스터만';
+                        } else if (targetIsAdmin) {
+                          // 일반 관리자는 마스터 관리자만 삭제 가능
+                          canDelete = isMasterAdmin;
+                          disabledReason = '마스터만';
+                        } else {
+                          // 일반 사용자는 관리자 이상 모두 삭제 가능
+                          canDelete = isMasterAdmin || isAdmin;
+                          disabledReason = '권한없음';
+                        }
+
+                        return canDelete ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>사용자 삭제</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  정말로 &quot;{user.name}&quot; 사용자를 삭제하시겠습니까?
+                                  관련된 모든 운행 기록도 함께 삭제됩니다.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>취소</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteUser(user)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? "삭제 중..." : "삭제"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <div className="flex items-center justify-center h-8 w-8 text-gray-400">
+                            <span className="text-xs">{disabledReason}</span>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
