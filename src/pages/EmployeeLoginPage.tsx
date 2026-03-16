@@ -185,7 +185,7 @@ export default function EmployeeLoginPage() {
                 setPlateError('')
               }}
               onKeyDown={e => e.key === 'Enter' && handleVerify()}
-              placeholder="예) 3456"
+              placeholder="예) 145*"
               autoFocus
               className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />
