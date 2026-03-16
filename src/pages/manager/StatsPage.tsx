@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
@@ -184,7 +184,7 @@ export default function ManagerStatsPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} unit="km" />
-              <Tooltip formatter={(value: number) => [`${value.toLocaleString()}km`, '운행거리']} />
+              <Tooltip formatter={(value) => [`${Number(value).toLocaleString()}km`, '운행거리']} />
               <Bar dataKey="거리" name="운행거리" fill="#06b6d4" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

@@ -159,6 +159,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string | null
       }
+      get_prev_odometer: {
+        Args: { p_vehicle_id: string }
+        Returns: number | null
+      }
+      register_manager: {
+        Args: { p_user_id: string; p_full_name: string; p_dept_id: string | null }
+        Returns: void
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

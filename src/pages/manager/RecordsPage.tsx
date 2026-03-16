@@ -209,7 +209,7 @@ export default function ManagerRecordsPage() {
 
   function exportToExcel() {
     if (!records) return
-    const rows = (records as RecordWithJoins[]).map(r => ({
+    const rows = (records as unknown as RecordWithJoins[]).map(r => ({
       '사용일자': formatDateRange(r),
       '운전자': r.driver_name,
       '용무': r.purpose,
@@ -305,7 +305,7 @@ export default function ManagerRecordsPage() {
               {!isLoading && records?.length === 0 && (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
               )}
-              {(records as RecordWithJoins[] | undefined)?.map(r => (
+              {(records as unknown as RecordWithJoins[] | undefined)?.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 text-gray-700 text-xs whitespace-nowrap">{formatDateRange(r)}</td>
                   <td className="px-3 py-3 font-medium text-gray-900">{r.driver_name}</td>
