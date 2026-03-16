@@ -105,6 +105,8 @@ export type Database = {
           cumulative_distance: number
           fuel_amount: number | null
           end_date: string | null
+          departure_time: string | null
+          arrival_time: string | null
           odometer_image_url: string | null
           receipt_image_url: string | null
         }
@@ -123,6 +125,8 @@ export type Database = {
           distance_traveled?: number | null
           cumulative_distance: number
           end_date?: string | null
+          departure_time?: string | null
+          arrival_time?: string | null
           fuel_amount?: number | null
           odometer_image_url?: string | null
           receipt_image_url?: string | null
@@ -142,6 +146,8 @@ export type Database = {
           distance_traveled?: number | null
           cumulative_distance?: number
           end_date?: string | null
+          departure_time?: string | null
+          arrival_time?: string | null
           fuel_amount?: number | null
           odometer_image_url?: string | null
           receipt_image_url?: string | null

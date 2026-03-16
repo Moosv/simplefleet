@@ -118,14 +118,16 @@ export default function RecordEntryPage() {
     }
   }, [tripType, usageDate, tripEndDate])
 
-  // 숙박 출장 운행시간 자동 계산
+  // 운행시간 자동 계산 (당일/숙박 공통)
   useEffect(() => {
-    if (tripType !== 'overnight' || !usageDate || !tripEndDate || !tripStartTime || !tripEndTime) {
+    if (tripType === 'none' || !usageDate || !tripStartTime || !tripEndTime) {
       setCalculatedDuration(null)
       return
     }
+    const endDate = tripType === 'overnight' ? tripEndDate : usageDate
+    if (!endDate) { setCalculatedDuration(null); return }
     const start = new Date(`${usageDate}T${tripStartTime}`)
-    const end = new Date(`${tripEndDate}T${tripEndTime}`)
+    const end = new Date(`${endDate}T${tripEndTime}`)
     if (end <= start) { setCalculatedDuration(null); return }
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10
     setCalculatedDuration(hours)
@@ -182,6 +184,15 @@ export default function RecordEntryPage() {
   async function onSubmit(data: FormData) {
     setTripError('')
 
+    if (tripType === 'sameday') {
+      const start = new Date(`${data.usage_date}T${tripStartTime}`)
+      const end = new Date(`${data.usage_date}T${tripEndTime}`)
+      if (end <= start) {
+        setTripError('도착 시각은 출발 시각보다 이후여야 합니다')
+        return
+      }
+    }
+
     if (tripType === 'overnight') {
       if (!tripEndDate) {
         setTripError('도착일을 입력해주세요')
@@ -202,13 +213,15 @@ export default function RecordEntryPage() {
     const driverName = isManagerSession ? (empSession?.name ?? '') : (selectedEmp?.name ?? '')
     const purpose = data.purpose_select === '기타' ? (data.purpose_custom ?? '기타') : data.purpose_select
     const finalDuration: number | undefined =
-      tripType === 'overnight' ? (calculatedDuration ?? undefined) : data.duration_hours
+      tripType !== 'none' ? (calculatedDuration ?? undefined) : undefined
 
     const newId = crypto.randomUUID()
     const { error } = await supabase.from('driving_records').insert({
       id: newId,
       usage_date: data.usage_date,
       end_date: tripType === 'overnight' ? tripEndDate : null,
+      departure_time: tripType !== 'none' ? tripStartTime : null,
+      arrival_time: tripType !== 'none' ? tripEndTime : null,
       vehicle_id: data.vehicle_id,
       department_id: data.department_id || null,
       employee_id: isManagerSession ? null : data.employee_id,
@@ -597,21 +610,36 @@ export default function RecordEntryPage() {
                 {errors.usage_date && <p className="mt-1 text-xs text-red-500">{errors.usage_date.message}</p>}
               </div>
 
-              {/* 운행 시간 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">운행 시간</label>
-                <div className="flex items-center gap-2">
+              {/* 출발 시각 / 도착 시각 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
                   <input
-                    type="number"
-                    step="0.5"
-                    inputMode="decimal"
-                    {...register('duration_hours', { setValueAs: v => v === '' ? undefined : Number(v) })}
-                    className="flex-1 px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                    placeholder="예) 2.5"
+                    type="time"
+                    value={tripStartTime}
+                    onChange={e => setTripStartTime(e.target.value)}
+                    className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
-                  <span className="text-sm text-gray-500">시간</span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
+                  <input
+                    type="time"
+                    value={tripEndTime}
+                    onChange={e => setTripEndTime(e.target.value)}
+                    className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
                 </div>
               </div>
+
+              {/* 자동 계산 운행시간 */}
+              {calculatedDuration !== null && (
+                <div className="bg-blue-100 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm text-blue-700">총 운행 시간 (자동 계산)</span>
+                  <span className="text-sm font-bold text-blue-800">{calculatedDuration}시간</span>
+                </div>
+              )}
+              {tripError && tripType === 'sameday' && <p className="text-xs text-red-500">{tripError}</p>}
 
               {/* 목적지 */}
               <div>
