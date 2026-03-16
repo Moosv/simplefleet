@@ -169,7 +169,7 @@ export default function ManagerVehiclesPage() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">차량번호 *</label>
               <input type="text" value={plate} onChange={e => setPlate(e.target.value)} required
-                placeholder="예) 12가 3456"
+                placeholder="예) 146*"
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div className="flex gap-2">
