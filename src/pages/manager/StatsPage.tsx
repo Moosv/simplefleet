@@ -5,8 +5,13 @@ import {
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
+import { useTeams } from '@/hooks/useEmployees'
 
-export default function StatsPage() {
+export default function ManagerStatsPage() {
+  const { profile } = useAuth()
+  const { data: teams } = useTeams()
+  const teamName = teams?.find(t => t.id === profile?.team_id)?.name ?? ''
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -15,15 +20,27 @@ export default function StatsPage() {
   const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
 
   const { data: records } = useQuery({
-    queryKey: ['stats_records', year, month],
+    queryKey: ['manager_stats_records', year, month, profile?.team_id],
     queryFn: async () => {
+      if (!profile?.team_id) return []
+
+      // 관리자 연구실(팀) 소속 직원 ID 목록 조회
+      const { data: teamEmps } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('team_id', profile.team_id)
+      const teamEmpIds = teamEmps?.map(e => e.id) ?? []
+      if (teamEmpIds.length === 0) return []
+
       const { data } = await supabase
         .from('driving_records')
-        .select('*, departments(name), employees(name, teams(name))')
+        .select('*')
         .gte('usage_date', monthStart)
         .lte('usage_date', monthEnd)
+        .in('employee_id', teamEmpIds)
       return data ?? []
     },
+    enabled: !!profile?.team_id,
   })
 
   // 용무별 집계
@@ -43,19 +60,6 @@ export default function StatsPage() {
   }, {})
   const driverChartData = Object.entries(driverStats ?? {}).map(([name, v]) => ({ name, ...v }))
 
-  // 실별 집계
-  type RecordWithTeam = typeof records extends (infer T)[] | undefined ? T : never
-  const teamStats = records?.reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
-    const teamName = ((r as RecordWithTeam & { employees?: { teams?: { name: string } | null } | null })
-      .employees?.teams?.name) ?? null
-    if (!teamName) return acc
-    if (!acc[teamName]) acc[teamName] = { 건수: 0, 거리: 0 }
-    acc[teamName].건수 += 1
-    acc[teamName].거리 += r.distance_traveled ?? 0
-    return acc
-  }, {})
-  const teamChartData = Object.entries(teamStats ?? {}).map(([name, v]) => ({ name, ...v }))
-
   const totalDistance = records?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalFuel = records?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
   const avgFuelEff = totalFuel > 0 ? (totalDistance / totalFuel).toFixed(1) : '-'
@@ -64,7 +68,6 @@ export default function StatsPage() {
     if (!records) return
     const rows = records.map(r => ({
       '사용일자': r.usage_date,
-      '소속': (r as typeof r & { departments?: { name: string } | null }).departments?.name ?? '',
       '운전자': r.driver_name,
       '용무': r.purpose,
       '목적지': r.destination,
@@ -81,7 +84,10 @@ export default function StatsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h1 className="text-xl font-bold text-gray-900">통계 리포트</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          통계 리포트
+          {teamName && <span className="ml-2 text-base font-normal text-gray-400">({teamName})</span>}
+        </h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <select
@@ -131,54 +137,60 @@ export default function StatsPage() {
         ))}
       </div>
 
-      {/* 실별 차트 (데이터 있을 때만 표시) */}
-      {teamChartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">실별 운행 현황</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={teamChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="건수" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="거리" fill="#ec4899" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
       <div className="grid lg:grid-cols-2 gap-4">
         {/* 용무별 */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
           <h2 className="text-sm font-semibold text-gray-800 mb-4">용무별 운행 횟수</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={purposeChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="건수" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {purposeChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={purposeChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="건수" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
+          )}
         </div>
 
-        {/* 운전자별 */}
+        {/* 운전자별 운행 건수 */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">운전자별 운행 현황</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={driverChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <h2 className="text-sm font-semibold text-gray-800 mb-4">운전자별 운행 건수</h2>
+          {driverChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={driverChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="건수" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
+          )}
+        </div>
+      </div>
+
+      {/* 운전자별 운행거리 */}
+      <div className="mt-4 bg-white rounded-xl border border-gray-100 p-5">
+        <h2 className="text-sm font-semibold text-gray-800 mb-4">운전자별 운행거리</h2>
+        {driverChartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={driverChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="건수" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="거리" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+              <YAxis tick={{ fontSize: 11 }} unit="km" />
+              <Tooltip formatter={(value: number) => [`${value.toLocaleString()}km`, '운행거리']} />
+              <Bar dataKey="거리" name="운행거리" fill="#06b6d4" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        ) : (
+          <div className="h-[220px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
+        )}
       </div>
     </div>
   )

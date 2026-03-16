@@ -7,7 +7,7 @@ export function useEmployees(activeOnly = true) {
     queryFn: async () => {
       let query = supabase
         .from('employees')
-        .select('*, departments(name)')
+        .select('*, departments(name), teams(id, name), vehicles(id, name, license_plate)')
         .order('name')
       if (activeOnly) query = query.eq('is_active', true)
       const { data, error } = await query
@@ -20,7 +20,7 @@ export function useEmployees(activeOnly = true) {
 export function useCreateEmployee() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { name: string; department_id: string | null }) => {
+    mutationFn: async (data: { name: string; department_id: string | null; team_id?: string | null; default_vehicle_id?: string | null }) => {
       const { error } = await supabase.from('employees').insert(data)
       if (error) throw error
     },
@@ -31,11 +31,22 @@ export function useCreateEmployee() {
 export function useUpdateEmployee() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name?: string; department_id?: string | null; is_active?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; department_id?: string | null; team_id?: string | null; default_vehicle_id?: string | null; is_active?: boolean } }) => {
       const { error } = await supabase.from('employees').update(data).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
+  })
+}
+
+export function useTeams() {
+  return useQuery({
+    queryKey: ['teams'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('teams').select('*').order('name')
+      if (error) throw error
+      return data
+    },
   })
 }
 
@@ -69,7 +80,12 @@ export function usePurposes() {
     queryFn: async () => {
       const { data, error } = await supabase.from('purposes').select('*').order('created_at')
       if (error) throw error
-      return data
+      // '기타'는 항상 맨 아래로
+      return (data ?? []).sort((a, b) => {
+        if (a.name === '기타') return 1
+        if (b.name === '기타') return -1
+        return 0
+      })
     },
   })
 }

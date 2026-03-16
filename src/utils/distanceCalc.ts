@@ -12,30 +12,32 @@ export async function calcDistanceTraveled(
   currentOdometer: number,
   excludeRecordId?: string,
 ): Promise<{ distance: number | null; prevOdometer: number | null; error: string | null }> {
-  let query = supabase
-    .from('driving_records')
-    .select('cumulative_distance')
-    .eq('vehicle_id', vehicleId)
-    .order('usage_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1)
+  // RLS를 우회하는 SECURITY DEFINER RPC를 사용해 이전 누적거리 조회
+  // excludeRecordId가 있으면 (수정 시) 직접 쿼리로 fallback
+  let prevOdometer: number | null = null
 
   if (excludeRecordId) {
-    query = query.neq('id', excludeRecordId)
+    const { data, error } = await supabase
+      .from('driving_records')
+      .select('cumulative_distance')
+      .eq('vehicle_id', vehicleId)
+      .neq('id', excludeRecordId)
+      .order('usage_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (error) return { distance: null, prevOdometer: null, error: '이전 주행 기록 조회 실패' }
+    prevOdometer = data?.[0]?.cumulative_distance ?? null
+  } else {
+    const { data, error } = await supabase.rpc('get_prev_odometer', { p_vehicle_id: vehicleId })
+    if (error) return { distance: null, prevOdometer: null, error: '이전 주행 기록 조회 실패' }
+    prevOdometer = data ?? null
   }
 
-  const { data, error } = await query
-
-  if (error) {
-    return { distance: null, prevOdometer: null, error: '이전 주행 기록 조회 실패' }
-  }
-
-  if (!data || data.length === 0) {
+  if (prevOdometer === null) {
     // 첫 번째 기록이므로 distance_traveled = null
     return { distance: null, prevOdometer: null, error: null }
   }
 
-  const prevOdometer = data[0].cumulative_distance
   const distance = currentOdometer - prevOdometer
 
   if (distance < 0) {

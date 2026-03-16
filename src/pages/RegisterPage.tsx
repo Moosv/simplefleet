@@ -24,8 +24,8 @@ export default function RegisterPage() {
       setError('비밀번호가 일치하지 않습니다.')
       return
     }
-    if (password.length < 8) {
-      setError('비밀번호는 8자 이상이어야 합니다.')
+    if (password.length < 6) {
+      setError('비밀번호는 6자 이상이어야 합니다.')
       return
     }
 
@@ -39,12 +39,10 @@ export default function RegisterPage() {
       return
     }
 
-    const { error: profileError } = await supabase.from('admin_profiles').insert({
-      id: data.user.id,
-      full_name: fullName,
-      department_id: departmentId || null,
-      role: 'department_manager',
-      status: 'pending',
+    const { error: profileError } = await supabase.rpc('register_manager', {
+      p_user_id: data.user.id,
+      p_full_name: fullName,
+      p_dept_id: departmentId || null,
     })
 
     if (profileError) {
@@ -91,7 +89,7 @@ export default function RegisterPage() {
                 d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">부서관리자 가입</h1>
+          <h1 className="text-2xl font-bold text-gray-900">관리자 가입</h1>
           <p className="text-sm text-gray-500 mt-1">승인 후 로그인 가능합니다</p>
         </div>
 
@@ -142,9 +140,9 @@ export default function RegisterPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={6}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="8자 이상"
+                placeholder="6자 이상"
               />
             </div>
 

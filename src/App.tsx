@@ -8,6 +8,7 @@ import AdminLayout from '@/components/layout/AdminLayout'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import RecordEntryPage from '@/pages/RecordEntryPage'
+import EmployeeLoginPage from '@/pages/EmployeeLoginPage'
 
 // Operator pages
 import OperatorDashboardPage from '@/pages/operator/DashboardPage'
@@ -20,6 +21,10 @@ import OperatorStatsPage from '@/pages/operator/StatsPage'
 // Manager pages
 import ManagerDashboardPage from '@/pages/manager/DashboardPage'
 import ManagerRecordsPage from '@/pages/manager/RecordsPage'
+import ManagerStatsPage from '@/pages/manager/StatsPage'
+import ManagerUsersPage from '@/pages/manager/UsersPage'
+import ManagerVehiclesPage from '@/pages/manager/VehiclesPage'
+import ManagerSettingsPage from '@/pages/manager/SettingsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,6 +77,22 @@ const MANAGER_NAV = [
     to: '/manager/records', label: '운행 기록',
     icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
   },
+  {
+    to: '/manager/stats', label: '통계',
+    icon: <Icon d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />,
+  },
+  {
+    to: '/manager/users', label: '사용자 관리',
+    icon: <Icon d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
+  },
+  {
+    to: '/manager/vehicles', label: '차량 관리',
+    icon: <Icon d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 1h6m1-1h4a1 1 0 001-1V9l-3-3h-2" />,
+  },
+  {
+    to: '/manager/settings', label: '용무 관리',
+    icon: <Icon d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
+  },
 ]
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -100,7 +121,7 @@ function OperatorPage({ children }: { children: React.ReactNode }) {
 function ManagerPage({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute allowedRoles={['department_manager']}>
-      <AdminLayout navItems={MANAGER_NAV} title="부서 관리자">
+      <AdminLayout navItems={MANAGER_NAV} title="관리자">
         {children}
       </AdminLayout>
     </ProtectedRoute>
@@ -117,6 +138,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/record" element={<RecordEntryPage />} />
+            <Route path="/employee" element={<EmployeeLoginPage />} />
+            <Route path="/employee/record" element={<RecordEntryPage />} />
 
             {/* 시스템운영자 라우트 */}
             <Route path="/operator/dashboard" element={<OperatorPage><OperatorDashboardPage /></OperatorPage>} />
@@ -126,9 +149,13 @@ export default function App() {
             <Route path="/operator/vehicles" element={<OperatorPage><OperatorVehiclesPage /></OperatorPage>} />
             <Route path="/operator/settings" element={<OperatorPage><OperatorSettingsPage /></OperatorPage>} />
 
-            {/* 부서관리자 라우트 */}
+            {/* 관리자 라우트 */}
             <Route path="/manager/dashboard" element={<ManagerPage><ManagerDashboardPage /></ManagerPage>} />
             <Route path="/manager/records" element={<ManagerPage><ManagerRecordsPage /></ManagerPage>} />
+            <Route path="/manager/stats" element={<ManagerPage><ManagerStatsPage /></ManagerPage>} />
+            <Route path="/manager/users" element={<ManagerPage><ManagerUsersPage /></ManagerPage>} />
+            <Route path="/manager/vehicles" element={<ManagerPage><ManagerVehiclesPage /></ManagerPage>} />
+            <Route path="/manager/settings" element={<ManagerPage><ManagerSettingsPage /></ManagerPage>} />
 
             {/* 기본 리다이렉트 */}
             <Route path="/" element={<RootRedirect />} />

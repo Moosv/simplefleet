@@ -76,7 +76,7 @@ export default function AdminLayout({ children, navItems, title }: Props) {
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{profile?.full_name}</p>
             <p className="text-xs text-gray-400">
-              {profile?.role === 'system_operator' ? '시스템 운영자' : '부서 관리자'}
+              {profile?.role === 'system_operator' ? '시스템 운영자' : '관리자'}
             </p>
           </div>
         </div>

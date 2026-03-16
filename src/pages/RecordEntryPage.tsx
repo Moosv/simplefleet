@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,12 +8,14 @@ import { supabase } from '@/lib/supabase'
 import { useEmployees, useDepartments, usePurposes, useVehicles } from '@/hooks/useEmployees'
 import { calcDistanceTraveled, toDateString } from '@/utils/distanceCalc'
 import { cn } from '@/utils/cn'
+import { EMP_SESSION_KEY } from './EmployeeLoginPage'
+import type { EmpSession } from './EmployeeLoginPage'
 
 const schema = z.object({
   vehicle_id: z.string().min(1, '차량을 선택하세요'),
-  usage_date: z.string().min(1, '출발일을 선택하세요'),
+  usage_date: z.string().min(1, '날짜를 선택하세요'),
   employee_id: z.string().min(1, '운전자를 선택하세요'),
-  department_id: z.string().min(1, '소속을 선택하세요'),
+  department_id: z.string().optional(),
   purpose_select: z.string().min(1, '용무를 선택하세요'),
   purpose_custom: z.string().optional(),
   destination: z.string().min(1, '목적지를 입력하세요'),
@@ -29,10 +32,29 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error'
+type TripType = 'none' | 'sameday' | 'overnight'
 
 export default function RecordEntryPage() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const vehicleIdFromUrl = searchParams.get('vehicle')
+
+  // 직원 포털 세션 감지 (/employee/record 진입 시)
+  const empSession: EmpSession | null = (() => {
+    try { return JSON.parse(localStorage.getItem(EMP_SESSION_KEY) ?? 'null') } catch { return null }
+  })()
+  const isEmployeePortal = window.location.pathname === '/employee/record'
+
+  // 세션 없이 /employee/record 접근 시 로그인 페이지로
+  if (isEmployeePortal && !empSession) {
+    navigate('/employee', { replace: true })
+    return null
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(EMP_SESSION_KEY)
+    navigate('/employee', { replace: true })
+  }
 
   const { data: vehicles } = useVehicles(true)
   const { data: employees } = useEmployees(true)
@@ -43,24 +65,44 @@ export default function RecordEntryPage() {
   const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; error: string | null }>({ distance: null, prev: null, error: null })
   const [distanceLoading, setDistanceLoading] = useState(false)
 
-  // 날짜 관련
-  const [tripEndDate, setTripEndDate] = useState('')       // 도착일
+  const [tripType, setTripType] = useState<TripType>('none')
+  const [tripEndDate, setTripEndDate] = useState('')
   const [tripStartTime, setTripStartTime] = useState('09:00')
   const [tripEndTime, setTripEndTime] = useState('18:00')
   const [calculatedDuration, setCalculatedDuration] = useState<number | null>(null)
   const [tripError, setTripError] = useState('')
-
-  // 당일 출장 pill 상태
-  const [sameDayActive, setSameDayActive] = useState(false)
-
   const [defaultApplied, setDefaultApplied] = useState(false)
+  const [submittedRecordId, setSubmittedRecordId] = useState<string | null>(null)
+  const [successView, setSuccessView] = useState<'message' | 'detail' | 'edit'>('message')
+  const [editSaved, setEditSaved] = useState(false)
+  const [editForm, setEditForm] = useState<{
+    purpose: string; destination: string; waypoint: string
+    cumulative_distance: string; fuel_amount: string; duration_hours: string
+  } | null>(null)
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      vehicle_id: vehicleIdFromUrl ?? '',
+      vehicle_id: vehicleIdFromUrl ?? empSession?.default_vehicle_id ?? '',
       usage_date: toDateString(),
+      employee_id: empSession?.id ?? '',
+      department_id: empSession?.department_id ?? '',
     },
+  })
+
+  // 제출 완료된 기록 조회 (확인/수정용)
+  const { data: submittedRecord, refetch: refetchSubmitted } = useQuery({
+    queryKey: ['submitted_record', submittedRecordId],
+    queryFn: async () => {
+      if (!submittedRecordId) return null
+      const { data } = await supabase
+        .from('driving_records')
+        .select('*, vehicles(name, license_plate)')
+        .eq('id', submittedRecordId)
+        .single()
+      return data
+    },
+    enabled: !!submittedRecordId,
   })
 
   const selectedVehicleId = watch('vehicle_id')
@@ -69,26 +111,16 @@ export default function RecordEntryPage() {
   const purposeSelect = watch('purpose_select')
   const usageDate = watch('usage_date')
 
-  // 출발일 기반 도착일 초기값
+  // 숙박 출장 전환 시 도착일 초기값 설정
   useEffect(() => {
-    if (usageDate && !tripEndDate) {
+    if (tripType === 'overnight' && usageDate && !tripEndDate) {
       setTripEndDate(usageDate)
     }
-  }, [usageDate, tripEndDate])
+  }, [tripType, usageDate, tripEndDate])
 
-  // 날짜로 출장 유형 계산
-  const tripDayDiff = (() => {
-    if (!usageDate || !tripEndDate) return 0
-    const start = new Date(usageDate)
-    const end = new Date(tripEndDate)
-    return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
-  })()
-  const tripTypeLabel = tripDayDiff === 0 ? '당일' : tripDayDiff === 1 ? '1박2일' : `${tripDayDiff}박${tripDayDiff + 1}일`
-  const isMultiDay = tripDayDiff > 0
-
-  // 다박 출장 운행 시간 자동 계산
+  // 숙박 출장 운행시간 자동 계산
   useEffect(() => {
-    if (!isMultiDay || !usageDate || !tripEndDate || !tripStartTime || !tripEndTime) {
+    if (tripType !== 'overnight' || !usageDate || !tripEndDate || !tripStartTime || !tripEndTime) {
       setCalculatedDuration(null)
       return
     }
@@ -97,42 +129,36 @@ export default function RecordEntryPage() {
     if (end <= start) { setCalculatedDuration(null); return }
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10
     setCalculatedDuration(hours)
-  }, [usageDate, tripEndDate, tripStartTime, tripEndTime, isMultiDay])
+  }, [tripType, usageDate, tripEndDate, tripStartTime, tripEndTime])
 
-  // 당일 출장 pill → 기본 운행 시간 4시간
-  useEffect(() => {
-    if (sameDayActive && !isMultiDay) {
-      setValue('duration_hours', 4)
-    }
-  }, [sameDayActive, isMultiDay, setValue])
-
-  // 다박 출장 감지 시 상세 필드 자동 펼침
-  useEffect(() => {
-    if (isMultiDay) setSameDayActive(true)
-  }, [isMultiDay])
-
-  // localStorage 기본 운전자 복원
+  // localStorage 기본 운전자 복원 (직원 포털 세션 없을 때만)
   useEffect(() => {
     if (!employees || defaultApplied) return
-    const savedEmpId = localStorage.getItem('sf_employee_id')
-    if (savedEmpId && employees.find(e => e.id === savedEmpId)) {
-      setValue('employee_id', savedEmpId)
+    if (!empSession) {
+      const savedEmpId = localStorage.getItem('sf_employee_id')
+      if (savedEmpId && employees.find(e => e.id === savedEmpId)) {
+        setValue('employee_id', savedEmpId)
+      }
     }
     setDefaultApplied(true)
-  }, [employees, defaultApplied, setValue])
+  }, [employees, defaultApplied, setValue, empSession])
 
   useEffect(() => {
-    if (selectedEmployeeId) {
-      localStorage.setItem('sf_employee_id', selectedEmployeeId)
-    }
-  }, [selectedEmployeeId])
+    if (selectedEmployeeId && !empSession) localStorage.setItem('sf_employee_id', selectedEmployeeId)
+  }, [selectedEmployeeId, empSession])
 
+  // 운전자 선택 시 부서 및 주 사용 차량 자동 설정 (비세션 경로)
   useEffect(() => {
     if (!selectedEmployeeId || !employees) return
     const emp = employees.find(e => e.id === selectedEmployeeId)
     if (emp?.department_id) setValue('department_id', emp.department_id)
-  }, [selectedEmployeeId, employees, setValue])
+    // URL 파라미터로 지정된 차량이 없으면 직원의 주 사용 차량을 기본값으로
+    if (!vehicleIdFromUrl && emp?.default_vehicle_id) {
+      setValue('vehicle_id', emp.default_vehicle_id)
+    }
+  }, [selectedEmployeeId, employees, setValue, vehicleIdFromUrl])
 
+  // 계기판 입력 시 주행거리 자동 계산
   useEffect(() => {
     if (!selectedVehicleId || !cumulativeDistance || isNaN(Number(cumulativeDistance))) return
     const timeout = setTimeout(async () => {
@@ -144,10 +170,21 @@ export default function RecordEntryPage() {
     return () => clearTimeout(timeout)
   }, [selectedVehicleId, cumulativeDistance])
 
+  // 숙박 출장 박수 라벨
+  const tripDayDiff = (() => {
+    if (!usageDate || !tripEndDate) return 0
+    const start = new Date(usageDate)
+    const end = new Date(tripEndDate)
+    return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+  })()
+  const overnightLabel = tripDayDiff === 1 ? '1박2일' : tripDayDiff > 1 ? `${tripDayDiff}박${tripDayDiff + 1}일` : ''
+
   async function onSubmit(data: FormData) {
-    if (sameDayActive && isMultiDay) {
-      if (!tripStartTime || !tripEndTime) {
-        setTripError('출발 시각과 도착 시각을 입력해주세요')
+    setTripError('')
+
+    if (tripType === 'overnight') {
+      if (!tripEndDate) {
+        setTripError('도착일을 입력해주세요')
         return
       }
       const start = new Date(`${data.usage_date}T${tripStartTime}`)
@@ -157,24 +194,25 @@ export default function RecordEntryPage() {
         return
       }
     }
-    setTripError('')
+
     setSubmitState('submitting')
 
-    const selectedEmp = employees?.find(e => e.id === data.employee_id)
-    const purpose =
-      data.purpose_select === '기타'
-        ? (data.purpose_custom ?? '기타')
-        : data.purpose_select
-
+    const isManagerSession = empSession?.is_manager === true
+    const selectedEmp = isManagerSession ? null : employees?.find(e => e.id === data.employee_id)
+    const driverName = isManagerSession ? (empSession?.name ?? '') : (selectedEmp?.name ?? '')
+    const purpose = data.purpose_select === '기타' ? (data.purpose_custom ?? '기타') : data.purpose_select
     const finalDuration: number | undefined =
-      isMultiDay ? (calculatedDuration ?? undefined) : data.duration_hours
+      tripType === 'overnight' ? (calculatedDuration ?? undefined) : data.duration_hours
 
+    const newId = crypto.randomUUID()
     const { error } = await supabase.from('driving_records').insert({
+      id: newId,
       usage_date: data.usage_date,
+      end_date: tripType === 'overnight' ? tripEndDate : null,
       vehicle_id: data.vehicle_id,
-      department_id: data.department_id,
-      employee_id: data.employee_id,
-      driver_name: selectedEmp?.name ?? '',
+      department_id: data.department_id || null,
+      employee_id: isManagerSession ? null : data.employee_id,
+      driver_name: driverName,
       purpose,
       destination: data.destination,
       waypoint: data.waypoint || null,
@@ -188,37 +226,212 @@ export default function RecordEntryPage() {
       console.error(error)
       setSubmitState('error')
     } else {
+      setSubmittedRecordId(newId)
+      setSuccessView('message')
       setSubmitState('success')
     }
   }
 
   function handleReset() {
-    reset({ vehicle_id: vehicleIdFromUrl ?? '', usage_date: toDateString() })
+    reset({
+      vehicle_id: vehicleIdFromUrl ?? empSession?.default_vehicle_id ?? '',
+      usage_date: toDateString(),
+      employee_id: empSession?.id ?? '',
+      department_id: empSession?.department_id ?? '',
+    })
     setSubmitState('idle')
     setDistanceInfo({ distance: null, prev: null, error: null })
+    setTripType('none')
     setTripEndDate('')
     setTripStartTime('09:00')
     setTripEndTime('18:00')
     setCalculatedDuration(null)
     setTripError('')
-    setSameDayActive(false)
     setDefaultApplied(false)
+    setSubmittedRecordId(null)
+    setSuccessView('message')
+    setEditSaved(false)
+    setEditForm(null)
   }
 
   if (submitState === 'success') {
+    // 수정 폼 저장
+    async function handleEditSave() {
+      if (!submittedRecordId || !editForm) return
+      const newCumulative = Number(editForm.cumulative_distance)
+      const distResult = submittedRecord?.vehicle_id
+        ? await calcDistanceTraveled(submittedRecord.vehicle_id, newCumulative, submittedRecordId)
+        : { distance: null }
+      await supabase.from('driving_records').update({
+        purpose: editForm.purpose,
+        destination: editForm.destination,
+        waypoint: editForm.waypoint || null,
+        cumulative_distance: newCumulative,
+        distance_traveled: distResult.distance,
+        fuel_amount: editForm.fuel_amount ? Number(editForm.fuel_amount) : null,
+        duration_hours: editForm.duration_hours ? Number(editForm.duration_hours) : null,
+      }).eq('id', submittedRecordId)
+      await refetchSubmitted()
+      setEditSaved(true)
+      setSuccessView('detail')
+    }
+
+    const r = submittedRecord
+    const vehicleName = (r as typeof r & { vehicles?: { name: string; license_plate: string } | null })?.vehicles
+
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <div className="min-h-screen bg-gray-50 pb-12">
+        {/* 헤더 */}
+        <div className="bg-white border-b border-gray-100">
+          <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900">운행 기록 완료</h1>
+              {empSession && <p className="text-xs text-blue-600 font-medium">{empSession.name}</p>}
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">운행 기록 완료!</h2>
-          <p className="text-gray-500 text-sm mb-6">운행 기록이 저장되었습니다.</p>
-          <button onClick={handleReset} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
-            새 기록 추가
-          </button>
+        </div>
+
+        <div className="max-w-lg mx-auto px-4 pt-8">
+          {/* 완료 메시지 */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">운행 기록 완료!</h2>
+            <p className="text-gray-500 text-sm">운행 기록이 저장되었습니다.</p>
+            <p className="text-gray-400 text-sm mt-1">수고하셨습니다. 좋은 하루 되세요 😊</p>
+          </div>
+
+          {/* 버튼 */}
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={handleReset}
+              className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+            >
+              새 기록 추가
+            </button>
+            {successView === 'message' && (
+              <button
+                onClick={() => setSuccessView('detail')}
+                className="flex-1 bg-white border border-gray-200 text-gray-700 py-3 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                방금 기록 확인하기
+              </button>
+            )}
+          </div>
+
+          {/* 기록 상세 / 수정 */}
+          {successView === 'detail' && r && (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {editSaved && (
+                <div className="px-5 py-3 bg-green-50 border-b border-green-100 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-xs text-green-700 font-medium">수정되어 저장되었습니다.</p>
+                </div>
+              )}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                <h3 className="text-sm font-semibold text-gray-800">방금 기록한 내용</h3>
+                <button
+                  onClick={() => {
+                    setEditSaved(false)
+                    setEditForm({
+                      purpose: r.purpose,
+                      destination: r.destination,
+                      waypoint: r.waypoint ?? '',
+                      cumulative_distance: String(r.cumulative_distance),
+                      fuel_amount: r.fuel_amount != null ? String(r.fuel_amount) : '',
+                      duration_hours: r.duration_hours != null ? String(r.duration_hours) : '',
+                    })
+                    setSuccessView('edit')
+                  }}
+                  className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  수정
+                </button>
+              </div>
+              <div className="divide-y divide-gray-50 text-sm">
+                {[
+                  { label: '운전자', value: r.driver_name },
+                  { label: '차량', value: vehicleName ? `${vehicleName.name} · ${vehicleName.license_plate}` : '-' },
+                  { label: '사용일자', value: r.end_date && r.end_date !== r.usage_date ? `${r.usage_date} ~ ${r.end_date}` : r.usage_date },
+                  { label: '용무', value: r.purpose },
+                  { label: '목적지', value: r.destination },
+                  { label: '경유지', value: r.waypoint ?? '-' },
+                  { label: '운행거리', value: r.distance_traveled != null ? `${r.distance_traveled}km` : '-' },
+                  { label: '누적거리', value: `${r.cumulative_distance.toLocaleString()}km` },
+                  { label: '주유량', value: r.fuel_amount != null ? `${r.fuel_amount}L` : '-' },
+                  { label: '운행시간', value: r.duration_hours != null ? `${r.duration_hours}시간` : '-' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between px-5 py-3">
+                    <span className="text-gray-400 text-xs">{label}</span>
+                    <span className="text-gray-800 font-medium text-xs text-right">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 수정 폼 */}
+          {successView === 'edit' && editForm && (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                <h3 className="text-sm font-semibold text-gray-800">기록 수정</h3>
+                <button onClick={() => setSuccessView('detail')} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+              </div>
+              <div className="p-5 space-y-4">
+                {[
+                  { label: '용무', key: 'purpose' as const },
+                  { label: '목적지', key: 'destination' as const },
+                  { label: '경유지', key: 'waypoint' as const },
+                ].map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+                    <input
+                      type="text"
+                      value={editForm[key]}
+                      onChange={e => setEditForm(f => f ? { ...f, [key]: e.target.value } : f)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km)</label>
+                    <input type="number" step="0.1" value={editForm.cumulative_distance}
+                      onChange={e => setEditForm(f => f ? { ...f, cumulative_distance: e.target.value } : f)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">주유량(L)</label>
+                    <input type="number" step="0.01" value={editForm.fuel_amount}
+                      onChange={e => setEditForm(f => f ? { ...f, fuel_amount: e.target.value } : f)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">운행시간(h)</label>
+                    <input type="number" step="0.5" value={editForm.duration_hours}
+                      onChange={e => setEditForm(f => f ? { ...f, duration_hours: e.target.value } : f)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <button
+                  onClick={handleEditSave}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -226,14 +439,34 @@ export default function RecordEntryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
+      {/* 헤더 */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900">운행 기록 입력</h1>
+              {empSession && (
+                <p className="text-xs text-blue-600 font-medium">{empSession.name}</p>
+              )}
+            </div>
           </div>
-          <h1 className="text-sm font-bold text-gray-900">운행 기록 입력</h1>
+          {empSession && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              로그아웃
+            </button>
+          )}
         </div>
       </div>
 
@@ -255,26 +488,41 @@ export default function RecordEntryPage() {
           {/* 운전자 */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">운전자 *</label>
-            <select {...register('employee_id')} className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">이름을 선택하세요</option>
-              {employees?.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
-            {errors.employee_id && <p className="mt-1 text-xs text-red-500">{errors.employee_id.message}</p>}
+            {empSession ? (
+              <div className="flex items-center gap-2 px-3 py-3 bg-blue-50 border border-blue-100 rounded-lg">
+                <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-white">{empSession.name.charAt(0)}</span>
+                </div>
+                <span className="text-sm font-semibold text-blue-700">{empSession.name}</span>
+                <input type="hidden" {...register('employee_id')} />
+              </div>
+            ) : (
+              <>
+                <select {...register('employee_id')} className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">이름을 선택하세요</option>
+                  {employees?.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+                {errors.employee_id && <p className="mt-1 text-xs text-red-500">{errors.employee_id.message}</p>}
+              </>
+            )}
           </div>
 
           {/* 소속 */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">소속 *</label>
-            <select {...register('department_id')} className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">소속을 선택하세요</option>
-              {departments?.map(dept => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
-            </select>
-            {errors.department_id && <p className="mt-1 text-xs text-red-500">{errors.department_id.message}</p>}
-          </div>
+          {!empSession && (
+            <div className="bg-white rounded-xl border border-gray-100 p-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">소속 *</label>
+              <select {...register('department_id')} className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">소속을 선택하세요</option>
+                {departments?.map(dept => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+              {errors.department_id && <p className="mt-1 text-xs text-red-500">{errors.department_id.message}</p>}
+            </div>
+          )}
+          {empSession && <input type="hidden" {...register('department_id')} />}
 
           {/* 용무 */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -300,163 +548,112 @@ export default function RecordEntryPage() {
                 {errors.purpose_custom && <p className="mt-1 text-xs text-red-500">{errors.purpose_custom.message}</p>}
               </div>
             )}
+          </div>
 
-            {/* 당일 출장 pill */}
-            <div className="mt-3">
+          {/* 출장 유형 선택 */}
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">출장 유형 *</label>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setSameDayActive(prev => !prev)}
+                onClick={() => setTripType(tripType === 'sameday' ? 'none' : 'sameday')}
                 className={cn(
-                  'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
-                  sameDayActive
-                    ? 'bg-blue-600 text-white border-blue-600'
+                  'py-3 rounded-xl text-sm font-semibold border-2 transition-all',
+                  tripType === 'sameday'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                     : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
                 )}
               >
                 당일 출장
               </button>
+              <button
+                type="button"
+                onClick={() => setTripType(tripType === 'overnight' ? 'none' : 'overnight')}
+                className={cn(
+                  'py-3 rounded-xl text-sm font-semibold border-2 transition-all',
+                  tripType === 'overnight'
+                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-violet-600'
+                )}
+              >
+                숙박 출장
+              </button>
             </div>
           </div>
 
-          {/* 출발일 + 도착일 (항상 표시) */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="grid grid-cols-2 gap-3">
+          {/* ─── 당일 출장 세부 폼 ─── */}
+          {tripType === 'sameday' && (
+            <div className="bg-blue-50 rounded-xl border-2 border-blue-200 p-4 space-y-4">
+              <p className="text-xs font-bold text-blue-600 tracking-widest uppercase">당일 출장</p>
+
+              {/* 출장일 */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">출발일 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">출장일 *</label>
                 <input
                   type="date"
                   {...register('usage_date')}
-                  className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
                 {errors.usage_date && <p className="mt-1 text-xs text-red-500">{errors.usage_date.message}</p>}
               </div>
+
+              {/* 운행 시간 */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">도착일</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">운행 시간</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.5"
+                    inputMode="decimal"
+                    {...register('duration_hours', { setValueAs: v => v === '' ? undefined : Number(v) })}
+                    className="flex-1 px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    placeholder="예) 2.5"
+                  />
+                  <span className="text-sm text-gray-500">시간</span>
+                </div>
+              </div>
+
+              {/* 목적지 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">목적지 *</label>
                 <input
-                  type="date"
-                  value={tripEndDate}
-                  min={usageDate}
-                  onChange={e => { setTripEndDate(e.target.value); setTripError('') }}
-                  className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  type="text"
+                  {...register('destination')}
+                  className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="예) 경기 수원"
                 />
+                {errors.destination && <p className="mt-1 text-xs text-red-500">{errors.destination.message}</p>}
               </div>
-            </div>
 
-            {/* 자동 계산 결과만 표시 (레이블 없이) */}
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-sm font-semibold text-blue-700">{tripTypeLabel}</span>
-            </div>
-
-            {/* 당일 출장 상세: 출발 시각 + 운행 시간 */}
-            {sameDayActive && !isMultiDay && (
-              <div className="mt-3 space-y-3 pt-3 border-t border-gray-100">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">출발 시각</label>
-                  <input
-                    type="time"
-                    value={tripStartTime}
-                    onChange={e => setTripStartTime(e.target.value)}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">운행 시간</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step="0.5"
-                      inputMode="decimal"
-                      {...register('duration_hours', { valueAsNumber: true })}
-                      className="flex-1 px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-500">시간</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 다박 출장: 출발/도착 시각 + 자동 계산 */}
-            {isMultiDay && (
-              <div className="mt-3 space-y-3 pt-3 border-t border-gray-100">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">출발 시각</label>
-                    <input
-                      type="time"
-                      value={tripStartTime}
-                      onChange={e => setTripStartTime(e.target.value)}
-                      className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">도착 시각</label>
-                    <input
-                      type="time"
-                      value={tripEndTime}
-                      onChange={e => { setTripEndTime(e.target.value); setTripError('') }}
-                      className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                {calculatedDuration !== null && (
-                  <div className="bg-blue-50 rounded-lg px-4 py-3 flex items-center justify-between">
-                    <span className="text-sm text-blue-700">총 운행 시간</span>
-                    <span className="text-sm font-bold text-blue-800">{calculatedDuration}시간</span>
-                  </div>
-                )}
-                {tripError && <p className="text-xs text-red-500">{tripError}</p>}
-              </div>
-            )}
-          </div>
-
-          {/* 상세 필드 — 당일 출장 pill 또는 다박 출장 시 표시 */}
-          {sameDayActive && (
-            <>
-              {/* 목적지 / 경유지 */}
-              <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">목적지 *</label>
-                  <input
-                    type="text"
-                    {...register('destination')}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="예) 경기 수원"
-                  />
-                  {errors.destination && <p className="mt-1 text-xs text-red-500">{errors.destination.message}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    경유지 <span className="text-gray-400 font-normal">(선택)</span>
-                  </label>
-                  <input
-                    type="text"
-                    {...register('waypoint')}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              {/* 경유지 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">경유지 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <input
+                  type="text"
+                  {...register('waypoint')}
+                  className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
               </div>
 
               {/* 현재 계기판 */}
-              <div className="bg-white rounded-xl border border-gray-100 p-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">현재 계기판 (누적) *</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">현재 계기판 (누적) *</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
                     step="0.1"
                     inputMode="decimal"
                     {...register('cumulative_distance', { valueAsNumber: true })}
-                    className="flex-1 px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     placeholder="예) 15234"
                   />
                   <span className="text-sm text-gray-500 whitespace-nowrap">km</span>
                 </div>
                 {errors.cumulative_distance && <p className="mt-1 text-xs text-red-500">{errors.cumulative_distance.message}</p>}
                 {distanceLoading && <p className="mt-2 text-xs text-gray-400">계산 중...</p>}
-                {!distanceLoading && distanceInfo.error && (
-                  <p className="mt-2 text-xs text-red-500">{distanceInfo.error}</p>
-                )}
+                {!distanceLoading && distanceInfo.error && <p className="mt-2 text-xs text-red-500">{distanceInfo.error}</p>}
                 {!distanceLoading && distanceInfo.distance !== null && !distanceInfo.error && (
-                  <div className="mt-2 bg-blue-50 rounded-lg px-3 py-2">
+                  <div className="mt-2 bg-blue-100 rounded-lg px-3 py-2">
                     <p className="text-xs text-blue-700">
                       이전 누적: {distanceInfo.prev?.toLocaleString()}km →
                       <span className="font-semibold"> 당일 주행 {distanceInfo.distance.toLocaleString()}km</span>
@@ -468,42 +665,155 @@ export default function RecordEntryPage() {
                 )}
               </div>
 
-              {/* 운행 시간 (다박이면 이미 자동 계산) + 주유량 */}
-              <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-                {!isMultiDay && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">운행 시간</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.5"
-                        inputMode="decimal"
-                        {...register('duration_hours', { valueAsNumber: true })}
-                        className="flex-1 px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="예) 2.5"
-                      />
-                      <span className="text-sm text-gray-500">시간</span>
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    주유량 <span className="text-gray-400 font-normal">(선택)</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      inputMode="decimal"
-                      {...register('fuel_amount', { valueAsNumber: true })}
-                      className="flex-1 px-3 py-3 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="예) 30.5"
-                    />
-                    <span className="text-sm text-gray-500">L</span>
-                  </div>
+              {/* 주유량 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">주유량 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    {...register('fuel_amount', { setValueAs: v => v === '' ? undefined : Number(v) })}
+                    className="flex-1 px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    placeholder="예) 30.5"
+                  />
+                  <span className="text-sm text-gray-500">L</span>
                 </div>
               </div>
-            </>
+            </div>
+          )}
+
+          {/* ─── 숙박 출장 세부 폼 ─── */}
+          {tripType === 'overnight' && (
+            <div className="bg-violet-50 rounded-xl border-2 border-violet-200 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-violet-600 tracking-widest uppercase">숙박 출장</p>
+                {overnightLabel && (
+                  <span className="bg-violet-600 text-white text-xs font-bold px-3 py-1 rounded-full">{overnightLabel}</span>
+                )}
+              </div>
+
+              {/* 출발일 / 도착일 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">출발일 *</label>
+                  <input
+                    type="date"
+                    {...register('usage_date')}
+                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">도착일 *</label>
+                  <input
+                    type="date"
+                    value={tripEndDate}
+                    min={usageDate}
+                    onChange={e => { setTripEndDate(e.target.value); setTripError('') }}
+                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* 출발 시각 / 도착 시각 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
+                  <input
+                    type="time"
+                    value={tripStartTime}
+                    onChange={e => setTripStartTime(e.target.value)}
+                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
+                  <input
+                    type="time"
+                    value={tripEndTime}
+                    onChange={e => { setTripEndTime(e.target.value); setTripError('') }}
+                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* 자동 계산 운행시간 */}
+              {calculatedDuration !== null && (
+                <div className="bg-violet-100 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm text-violet-700">총 운행 시간 (자동 계산)</span>
+                  <span className="text-sm font-bold text-violet-800">{calculatedDuration}시간</span>
+                </div>
+              )}
+              {tripError && <p className="text-xs text-red-500">{tripError}</p>}
+
+              {/* 목적지 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">목적지 *</label>
+                <input
+                  type="text"
+                  {...register('destination')}
+                  className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                  placeholder="예) 경기 수원"
+                />
+                {errors.destination && <p className="mt-1 text-xs text-red-500">{errors.destination.message}</p>}
+              </div>
+
+              {/* 경유지 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">경유지 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <input
+                  type="text"
+                  {...register('waypoint')}
+                  className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                />
+              </div>
+
+              {/* 현재 계기판 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">현재 계기판 (누적) *</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    {...register('cumulative_distance', { valueAsNumber: true })}
+                    className="flex-1 px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                    placeholder="예) 15234"
+                  />
+                  <span className="text-sm text-gray-500 whitespace-nowrap">km</span>
+                </div>
+                {errors.cumulative_distance && <p className="mt-1 text-xs text-red-500">{errors.cumulative_distance.message}</p>}
+                {distanceLoading && <p className="mt-2 text-xs text-gray-400">계산 중...</p>}
+                {!distanceLoading && distanceInfo.error && <p className="mt-2 text-xs text-red-500">{distanceInfo.error}</p>}
+                {!distanceLoading && distanceInfo.distance !== null && !distanceInfo.error && (
+                  <div className="mt-2 bg-violet-100 rounded-lg px-3 py-2">
+                    <p className="text-xs text-violet-700">
+                      이전 누적: {distanceInfo.prev?.toLocaleString()}km →
+                      <span className="font-semibold"> 주행 {distanceInfo.distance.toLocaleString()}km</span>
+                    </p>
+                  </div>
+                )}
+                {!distanceLoading && distanceInfo.prev === null && distanceInfo.distance === null && !distanceInfo.error && cumulativeDistance > 0 && (
+                  <p className="mt-2 text-xs text-gray-400">첫 번째 기록입니다. 주행거리는 자동 계산되지 않습니다.</p>
+                )}
+              </div>
+
+              {/* 주유량 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">주유량 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    {...register('fuel_amount', { setValueAs: v => v === '' ? undefined : Number(v) })}
+                    className="flex-1 px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                    placeholder="예) 30.5"
+                  />
+                  <span className="text-sm text-gray-500">L</span>
+                </div>
+              </div>
+            </div>
           )}
 
           {submitState === 'error' && (
@@ -512,13 +822,20 @@ export default function RecordEntryPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={submitState === 'submitting'}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-semibold hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {submitState === 'submitting' ? '저장 중...' : '운행 기록 저장'}
-          </button>
+          {tripType !== 'none' && (
+            <button
+              type="submit"
+              disabled={submitState === 'submitting'}
+              className={cn(
+                'w-full text-white py-4 rounded-xl text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm',
+                tripType === 'overnight'
+                  ? 'bg-violet-600 hover:bg-violet-700 active:bg-violet-800'
+                  : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+              )}
+            >
+              {submitState === 'submitting' ? '저장 중...' : '운행 기록 저장'}
+            </button>
+          )}
         </form>
       </div>
     </div>

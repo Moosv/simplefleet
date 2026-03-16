@@ -93,7 +93,7 @@ export default function LoginPage() {
 
           <div className="mt-4 pt-4 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-500">
-              부서관리자 가입 신청{' '}
+              관리자 가입 신청{' '}
               <Link to="/register" className="text-blue-600 font-medium hover:underline">
                 회원가입
               </Link>

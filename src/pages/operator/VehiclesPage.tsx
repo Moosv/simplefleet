@@ -7,6 +7,81 @@ import type { Vehicle } from '@/types'
 
 const BASE_URL = window.location.origin
 
+function VehicleEditModal({
+  vehicle,
+  onClose,
+}: {
+  vehicle: Vehicle
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState(vehicle.name)
+  const [plate, setPlate] = useState(vehicle.license_plate)
+
+  const updateVehicle = useMutation({
+    mutationFn: async (data: { name: string; license_plate: string }) => {
+      const { error } = await supabase.from('vehicles').update(data).eq('id', vehicle.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+      onClose()
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-bold text-gray-900 mb-4">차량 수정</h2>
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            updateVehicle.mutate({ name: name.trim(), license_plate: plate.trim() })
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">차량명</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">차량번호</label>
+            <input
+              type="text"
+              value={plate}
+              onChange={e => setPlate(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={updateVehicle.isPending}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {updateVehicle.isPending ? '저장 중...' : '저장'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function VehiclesPage() {
   const { data: vehicles } = useVehicles(false)
   const queryClient = useQueryClient()
@@ -14,6 +89,7 @@ export default function VehiclesPage() {
   const [name, setName] = useState('')
   const [plate, setPlate] = useState('')
   const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null)
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
   const qrRef = useRef<HTMLDivElement>(null)
 
   const createVehicle = useMutation({
@@ -32,6 +108,14 @@ export default function VehiclesPage() {
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from('vehicles').update({ is_active }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
+  })
+
+  const deleteVehicle = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('vehicles').delete().eq('id', id)
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
@@ -134,10 +218,26 @@ export default function VehiclesPage() {
                 QR 보기
               </button>
               <button
+                onClick={() => setEditingVehicle(vehicle)}
+                className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+              >
+                수정
+              </button>
+              <button
                 onClick={() => toggleActive.mutate({ id: vehicle.id, is_active: !vehicle.is_active })}
-                className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
               >
                 {vehicle.is_active ? '비활성화' : '활성화'}
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`'${vehicle.name}' 차량을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) {
+                    deleteVehicle.mutate(vehicle.id)
+                  }
+                }}
+                className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+              >
+                삭제
               </button>
             </div>
 
@@ -174,6 +274,13 @@ export default function VehiclesPage() {
           </div>
         )}
       </div>
+
+      {editingVehicle && (
+        <VehicleEditModal
+          vehicle={editingVehicle}
+          onClose={() => setEditingVehicle(null)}
+        />
+      )}
     </div>
   )
 }

@@ -2,40 +2,50 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Link } from 'react-router-dom'
 
-function StatCard({ title, value, sub, color }: { title: string; value: string | number; sub?: string; color: string }) {
+function StatCard({ title, value, color }: { title: string; value: string | number; color: string }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5">
       <p className="text-sm text-gray-500 mb-1">{title}</p>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function AwardCard({
+  emoji,
+  title,
+  name,
+  stat,
+  bgColor,
+  textColor,
+}: {
+  emoji: string
+  title: string
+  name: string | null
+  stat: string
+  bgColor: string
+  textColor: string
+}) {
+  return (
+    <div className={`rounded-xl border p-5 ${bgColor}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">{emoji}</span>
+        <p className={`text-xs font-semibold ${textColor}`}>{title}</p>
+      </div>
+      <p className="text-lg font-bold text-gray-900 truncate">{name ?? '-'}</p>
+      <p className={`text-sm mt-0.5 ${textColor}`}>{stat}</p>
     </div>
   )
 }
 
 export default function OperatorDashboardPage() {
-  const now = new Date()
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const today = now.toISOString().split('T')[0]
-
-  const { data: monthlyStats } = useQuery({
-    queryKey: ['dashboard_monthly', monthStart],
+  const { data: allRecords } = useQuery({
+    queryKey: ['dashboard_all_records'],
     queryFn: async () => {
       const { data } = await supabase
         .from('driving_records')
-        .select('distance_traveled, fuel_amount')
-        .gte('usage_date', monthStart)
-        .lte('usage_date', today)
+        .select('driver_name, distance_traveled, fuel_amount, duration_hours')
       return data ?? []
-    },
-  })
-
-  const { data: totalRecords } = useQuery({
-    queryKey: ['dashboard_total_records'],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from('driving_records')
-        .select('*', { count: 'exact', head: true })
-      return count ?? 0
     },
   })
 
@@ -63,17 +73,44 @@ export default function OperatorDashboardPage() {
     },
   })
 
-  const monthlyDistance = monthlyStats?.reduce((sum, r) => sum + (r.distance_traveled ?? 0), 0) ?? 0
-  const monthlyFuel = monthlyStats?.reduce((sum, r) => sum + (r.fuel_amount ?? 0), 0) ?? 0
-  const monthlyCount = monthlyStats?.length ?? 0
+  // 누적 합산
+  const totalCount = allRecords?.length ?? 0
+  const totalDistance = allRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
+  const totalHours = allRecords?.reduce((s, r) => s + (r.duration_hours ?? 0), 0) ?? 0
+  const totalFuel = allRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
+
+  // 운전자별 집계
+  const driverMap = new Map<string, { trips: number; distance: number; fuel: number }>()
+  for (const r of allRecords ?? []) {
+    const key = r.driver_name
+    if (!driverMap.has(key)) driverMap.set(key, { trips: 0, distance: 0, fuel: 0 })
+    const d = driverMap.get(key)!
+    d.trips += 1
+    d.distance += r.distance_traveled ?? 0
+    d.fuel += r.fuel_amount ?? 0
+  }
+  const drivers = [...driverMap.entries()]
+
+  const mostTripsDriver = drivers.length
+    ? drivers.reduce((a, b) => (b[1].trips > a[1].trips ? b : a))
+    : null
+
+  const longestDriver = drivers.length
+    ? drivers.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
+    : null
+
+  const fuelDrivers = drivers.filter(([, v]) => v.fuel > 0 && v.distance > 0)
+  const sortedByFuel = [...fuelDrivers].sort(
+    (a, b) => b[1].distance / b[1].fuel - a[1].distance / a[1].fuel
+  )
+  const bestFuelDriver = sortedByFuel[0] ?? null
+  const worstFuelDriver = sortedByFuel[sortedByFuel.length - 1] ?? null
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">대시보드</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {now.getFullYear()}년 {now.getMonth() + 1}월 현황
-        </p>
+        <p className="text-sm text-gray-500 mt-0.5">전체 누적 현황</p>
       </div>
 
       {/* 승인 대기 알림 */}
@@ -88,7 +125,7 @@ export default function OperatorDashboardPage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-yellow-800">
-                부서관리자 승인 대기 {pendingCount}건
+                관리자 승인 대기 {pendingCount}건
               </p>
               <p className="text-xs text-yellow-600">클릭하여 승인하기 →</p>
             </div>
@@ -96,28 +133,55 @@ export default function OperatorDashboardPage() {
         </Link>
       )}
 
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          title="이번달 운행 횟수"
-          value={`${monthlyCount}회`}
-          color="text-blue-600"
-        />
-        <StatCard
-          title="이번달 주행거리"
-          value={`${monthlyDistance.toLocaleString()}km`}
-          color="text-green-600"
-        />
-        <StatCard
-          title="이번달 주유량"
-          value={`${monthlyFuel.toFixed(1)}L`}
-          color="text-orange-600"
-        />
-        <StatCard
-          title="총 운행 기록"
-          value={`${totalRecords}건`}
-          color="text-purple-600"
-        />
+      {/* 누적 통계 카드 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard title="누적 운행 횟수" value={`${totalCount}회`} color="text-blue-600" />
+        <StatCard title="누적 주행거리" value={`${totalDistance.toLocaleString()}km`} color="text-green-600" />
+        <StatCard title="누적 운행시간" value={`${totalHours.toFixed(1)}h`} color="text-purple-600" />
+        <StatCard title="누적 주유량" value={`${totalFuel.toFixed(1)}L`} color="text-orange-600" />
+      </div>
+
+      {/* 운전자 어워드 */}
+      <div className="mb-8">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">이달의 드라이버</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <AwardCard
+            emoji="⛽"
+            title="연비의 신"
+            name={bestFuelDriver ? bestFuelDriver[0] : null}
+            stat={bestFuelDriver
+              ? `${(bestFuelDriver[1].distance / bestFuelDriver[1].fuel).toFixed(1)} km/L`
+              : '데이터 없음'}
+            bgColor="border-emerald-100 bg-emerald-50"
+            textColor="text-emerald-600"
+          />
+          <AwardCard
+            emoji="🔥"
+            title="연비 파괴자"
+            name={worstFuelDriver && worstFuelDriver[0] !== bestFuelDriver?.[0] ? worstFuelDriver[0] : null}
+            stat={worstFuelDriver && worstFuelDriver[0] !== bestFuelDriver?.[0]
+              ? `${(worstFuelDriver[1].distance / worstFuelDriver[1].fuel).toFixed(1)} km/L`
+              : '데이터 없음'}
+            bgColor="border-red-100 bg-red-50"
+            textColor="text-red-500"
+          />
+          <AwardCard
+            emoji="🏁"
+            title="최다 체크인"
+            name={mostTripsDriver ? mostTripsDriver[0] : null}
+            stat={mostTripsDriver ? `총 ${mostTripsDriver[1].trips}회 운행` : '데이터 없음'}
+            bgColor="border-blue-100 bg-blue-50"
+            textColor="text-blue-600"
+          />
+          <AwardCard
+            emoji="🛣️"
+            title="최장 마일리지"
+            name={longestDriver ? longestDriver[0] : null}
+            stat={longestDriver ? `총 ${longestDriver[1].distance.toLocaleString()}km` : '데이터 없음'}
+            bgColor="border-violet-100 bg-violet-50"
+            textColor="text-violet-600"
+          />
+        </div>
       </div>
 
       {/* 최근 운행 기록 */}

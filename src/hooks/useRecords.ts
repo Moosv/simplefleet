@@ -7,6 +7,7 @@ export interface RecordFilters {
   endDate?: string
   departmentId?: string
   employeeId?: string
+  driverName?: string
   vehicleId?: string
 }
 
@@ -29,6 +30,7 @@ export function useRecords(filters?: RecordFilters) {
       if (filters?.endDate) query = query.lte('usage_date', filters.endDate)
       if (filters?.departmentId) query = query.eq('department_id', filters.departmentId)
       if (filters?.employeeId) query = query.eq('employee_id', filters.employeeId)
+      if (filters?.driverName) query = query.eq('driver_name', filters.driverName)
       if (filters?.vehicleId) query = query.eq('vehicle_id', filters.vehicleId)
 
       const { data, error } = await query
