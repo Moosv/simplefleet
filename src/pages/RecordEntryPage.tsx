@@ -65,6 +65,18 @@ export default function RecordEntryPage() {
   const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; error: string | null }>({ distance: null, prev: null, error: null })
   const [distanceLoading, setDistanceLoading] = useState(false)
 
+  function formatTimeValue(newVal: string, prevVal: string): string {
+    const isDeleting = newVal.length < prevVal.length
+    const digits = newVal.replace(/\D/g, '').slice(0, 4)
+    if (isDeleting) {
+      return digits.length <= 2 ? digits : digits.slice(0, 2) + ':' + digits.slice(2)
+    }
+    if (digits.length === 0) return ''
+    if (digits.length <= 1) return digits
+    if (digits.length === 2) return digits + ':'
+    return digits.slice(0, 2) + ':' + digits.slice(2)
+  }
+
   const [tripType, setTripType] = useState<TripType>('none')
   const [tripEndDate, setTripEndDate] = useState('')
   const [tripStartTime, setTripStartTime] = useState('09:00')
@@ -624,7 +636,7 @@ export default function RecordEntryPage() {
                     inputMode="numeric"
                     maxLength={5}
                     value={tripStartTime}
-                    onChange={e => setTripStartTime(e.target.value)}
+                    onChange={e => setTripStartTime(formatTimeValue(e.target.value, tripStartTime))}
                     placeholder="예) 09:00"
                     className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
@@ -636,7 +648,7 @@ export default function RecordEntryPage() {
                     inputMode="numeric"
                     maxLength={5}
                     value={tripEndTime}
-                    onChange={e => setTripEndTime(e.target.value)}
+                    onChange={e => setTripEndTime(formatTimeValue(e.target.value, tripEndTime))}
                     placeholder="예) 18:00"
                     className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
@@ -763,7 +775,7 @@ export default function RecordEntryPage() {
                     inputMode="numeric"
                     maxLength={5}
                     value={tripStartTime}
-                    onChange={e => setTripStartTime(e.target.value)}
+                    onChange={e => setTripStartTime(formatTimeValue(e.target.value, tripStartTime))}
                     placeholder="예) 09:00"
                     className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                   />
@@ -775,7 +787,7 @@ export default function RecordEntryPage() {
                     inputMode="numeric"
                     maxLength={5}
                     value={tripEndTime}
-                    onChange={e => { setTripEndTime(e.target.value); setTripError('') }}
+                    onChange={e => { setTripEndTime(formatTimeValue(e.target.value, tripEndTime)); setTripError('') }}
                     placeholder="예) 18:00"
                     className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                   />
