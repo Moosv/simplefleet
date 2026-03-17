@@ -139,7 +139,11 @@ export default function RecordEntryPage() {
   const { data: departments } = useDepartments()
   const { data: purposes } = usePurposes()
 
-  const [submitState, setSubmitState] = useState<SubmitState>('idle')
+  const LAST_RECORD_KEY = 'last_submitted_record_id'
+
+  const [submitState, setSubmitState] = useState<SubmitState>(() => {
+    return sessionStorage.getItem(LAST_RECORD_KEY) ? 'success' : 'idle'
+  })
   const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; error: string | null }>({ distance: null, prev: null, error: null })
   const [distanceLoading, setDistanceLoading] = useState(false)
 
@@ -150,7 +154,9 @@ export default function RecordEntryPage() {
   const [calculatedDuration, setCalculatedDuration] = useState<number | null>(null)
   const [tripError, setTripError] = useState('')
   const [defaultApplied, setDefaultApplied] = useState(false)
-  const [submittedRecordId, setSubmittedRecordId] = useState<string | null>(null)
+  const [submittedRecordId, setSubmittedRecordId] = useState<string | null>(
+    () => sessionStorage.getItem(LAST_RECORD_KEY)
+  )
   const [successView, setSuccessView] = useState<'message' | 'detail' | 'edit'>('message')
   const [editSaved, setEditSaved] = useState(false)
   const [editForm, setEditForm] = useState<{
@@ -351,6 +357,7 @@ export default function RecordEntryPage() {
     setCalculatedDuration(null)
     setTripError('')
     setDefaultApplied(false)
+    sessionStorage.removeItem(LAST_RECORD_KEY)
     setSubmittedRecordId(null)
     setSuccessView('message')
     setEditSaved(false)
@@ -415,7 +422,10 @@ export default function RecordEntryPage() {
           {/* 버튼 */}
           <div className="flex flex-col gap-2 mb-6">
             <button
-              onClick={() => navigate(`/vehicle/dashboard?vehicle=${selectedVehicleId}`)}
+              onClick={() => {
+                if (submittedRecordId) sessionStorage.setItem(LAST_RECORD_KEY, submittedRecordId)
+                navigate(`/vehicle/dashboard?vehicle=${selectedVehicleId}`)
+              }}
               className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -424,18 +434,6 @@ export default function RecordEntryPage() {
               </svg>
               대시보드 보기
             </button>
-            {empSession && !empSession.is_manager && (
-              <button
-                onClick={() => navigate('/employee/dashboard')}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                내 운행 기록 보기
-              </button>
-            )}
             <div className="flex gap-2">
               <button
                 onClick={handleReset}
@@ -467,23 +465,36 @@ export default function RecordEntryPage() {
               )}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
                 <h3 className="text-sm font-semibold text-gray-800">방금 기록한 내용</h3>
-                <button
-                  onClick={() => {
-                    setEditSaved(false)
-                    setEditForm({
-                      purpose: r.purpose,
-                      destination: r.destination,
-                      waypoint: r.waypoint ?? '',
-                      cumulative_distance: String(r.cumulative_distance),
-                      fuel_amount: r.fuel_amount != null ? String(r.fuel_amount) : '',
-                      duration_hours: r.duration_hours != null ? String(r.duration_hours) : '',
-                    })
-                    setSuccessView('edit')
-                  }}
-                  className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  수정
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditSaved(false)
+                      setEditForm({
+                        purpose: r.purpose,
+                        destination: r.destination,
+                        waypoint: r.waypoint ?? '',
+                        cumulative_distance: String(r.cumulative_distance),
+                        fuel_amount: r.fuel_amount != null ? String(r.fuel_amount) : '',
+                        duration_hours: r.duration_hours != null ? String(r.duration_hours) : '',
+                      })
+                      setSuccessView('edit')
+                    }}
+                    className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!submittedRecordId) return
+                      if (!confirm('이 운행 기록을 삭제할까요?')) return
+                      await supabase.from('driving_records').delete().eq('id', submittedRecordId)
+                      handleReset()
+                    }}
+                    className="text-xs px-3 py-1.5 bg-white border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors font-medium"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-gray-50 text-sm">
                 {[
