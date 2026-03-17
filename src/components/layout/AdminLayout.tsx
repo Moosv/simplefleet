@@ -90,7 +90,7 @@ export default function AdminLayout({ children, navItems, title }: Props) {
           </svg>
           로그아웃
         </button>
-        <p className="text-center text-xs text-gray-300 mt-2">v1.0.0</p>
+        <p className="text-center text-xs text-gray-300 mt-2">v1.1.0</p>
       </div>
     </div>
   )

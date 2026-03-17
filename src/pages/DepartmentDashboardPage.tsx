@@ -5,54 +5,55 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { EMP_SESSION_KEY } from './EmployeeLoginPage'
-import type { EmpSession } from './EmployeeLoginPage'
 
 type Tab = 'dashboard' | 'records' | 'stats'
 
-export default function VehicleDashboardPage() {
+export default function DepartmentDashboardPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const vehicleId = searchParams.get('vehicle') ?? ''
+  const departmentId = searchParams.get('department') ?? ''
   const [tab, setTab] = useState<Tab>('dashboard')
-
-  const empSession: EmpSession | null = (() => {
-    try { return JSON.parse(localStorage.getItem(EMP_SESSION_KEY) ?? 'null') } catch { return null }
-  })()
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
 
-  // 차량 정보
-  const { data: vehicle } = useQuery({
-    queryKey: ['vehicle_info', vehicleId],
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'dashboard', label: '대시보드' },
+    { key: 'records', label: '운행기록' },
+    { key: 'stats', label: '통계' },
+  ]
+
+  // 부서 정보
+  const { data: department } = useQuery({
+    queryKey: ['dept_info', departmentId],
     queryFn: async () => {
-      if (!vehicleId) return null
+      if (!departmentId) return null
       const { data } = await supabase
-        .from('vehicles')
-        .select('id, name, license_plate')
-        .eq('id', vehicleId)
+        .from('departments')
+        .select('id, name')
+        .eq('id', departmentId)
         .single()
       return data
     },
-    enabled: !!vehicleId,
+    enabled: !!departmentId,
+    staleTime: 0,
   })
 
   // 전체 운행 기록
   const { data: allRecords, isLoading: loadingRecords } = useQuery({
-    queryKey: ['vehicle_all_records', vehicleId],
+    queryKey: ['dept_all_records', departmentId],
     queryFn: async () => {
-      if (!vehicleId) return []
+      if (!departmentId) return []
       const { data } = await supabase
         .from('driving_records')
-        .select('id, usage_date, end_date, driver_name, purpose, waypoint, destination, distance_traveled, cumulative_distance, fuel_amount, duration_hours, created_at')
-        .eq('vehicle_id', vehicleId)
+        .select('id, usage_date, end_date, driver_name, purpose, waypoint, destination, distance_traveled, cumulative_distance, fuel_amount, duration_hours, created_at, vehicles(name, license_plate)')
+        .eq('department_id', departmentId)
         .order('usage_date', { ascending: false })
         .order('created_at', { ascending: false })
-      return data ?? []
+      return (data ?? []) as (typeof data extends (infer T)[] | null ? T : never)[]
     },
-    enabled: !!vehicleId,
+    enabled: !!departmentId,
     staleTime: 0,
   })
 
@@ -61,42 +62,50 @@ export default function VehicleDashboardPage() {
   const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
 
   const { data: monthRecords } = useQuery({
-    queryKey: ['vehicle_month_records', vehicleId, year, month],
+    queryKey: ['dept_month_records', departmentId, year, month],
     queryFn: async () => {
-      if (!vehicleId) return []
+      if (!departmentId) return []
       const { data } = await supabase
         .from('driving_records')
         .select('driver_name, purpose, distance_traveled, fuel_amount')
-        .eq('vehicle_id', vehicleId)
+        .eq('department_id', departmentId)
         .gte('usage_date', monthStart)
         .lte('usage_date', monthEnd)
       return data ?? []
     },
-    enabled: !!vehicleId,
+    enabled: !!departmentId,
     staleTime: 0,
   })
 
-  // 이번 달 통계 (대시보드용 - 현재 월 고정)
+  // 이번 달 (대시보드용)
   const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
 
   const { data: thisMonthRecords } = useQuery({
-    queryKey: ['vehicle_thismonth', vehicleId, thisMonthStart],
+    queryKey: ['dept_thismonth', departmentId, thisMonthStart],
     queryFn: async () => {
-      if (!vehicleId) return []
+      if (!departmentId) return []
       const { data } = await supabase
         .from('driving_records')
         .select('driver_name, distance_traveled, fuel_amount, cumulative_distance')
-        .eq('vehicle_id', vehicleId)
+        .eq('department_id', departmentId)
         .gte('usage_date', thisMonthStart)
         .lte('usage_date', thisMonthEnd)
       return data ?? []
     },
-    enabled: !!vehicleId,
+    enabled: !!departmentId,
     staleTime: 0,
   })
 
-  // 통계 계산
+  // 누적 전체 통계
+  const totalDistanceAll = allRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
+  const totalCountAll = allRecords?.length ?? 0
+
+  // 이번 달 통계
+  const thisMonthDist = thisMonthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
+  const thisMonthFuel = thisMonthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
+
+  // 월별 통계
   const totalDistance = monthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalFuel = monthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
   const avgFuelEff = totalFuel > 0 ? (totalDistance / totalFuel).toFixed(1) : '-'
@@ -115,53 +124,29 @@ export default function VehicleDashboardPage() {
   }, {})
   const purposeChartData = Object.entries(purposeStats ?? {}).map(([name, 건수]) => ({ name, 건수 }))
 
-  // 이번 달 요약 (대시보드)
-  const thisMonthDist = thisMonthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
-  const thisMonthFuel = thisMonthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
-  const latestOdometer = allRecords?.[0]?.cumulative_distance ?? null
-
   function formatDateRange(r: { usage_date: string; end_date?: string | null }) {
     if (r.end_date && r.end_date !== r.usage_date) return `${r.usage_date} ~ ${r.end_date}`
     return r.usage_date
   }
 
-  const TABS: { key: Tab; label: string }[] = [
-    { key: 'dashboard', label: '대시보드' },
-    { key: 'records', label: '운행기록' },
-    { key: 'stats', label: '통계' },
-  ]
+  type RecordItem = NonNullable<typeof allRecords>[number]
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <p className="text-sm font-bold text-gray-900">{vehicle?.name ?? '차량 대시보드'}</p>
-            {vehicle?.license_plate && (
-              <p className="text-xs text-gray-400">{vehicle.license_plate}</p>
-            )}
-          </div>
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div>
+          <p className="text-sm font-bold text-gray-900">{department?.name ?? '부서 현황'}</p>
+          <p className="text-xs text-gray-400">전체 누적 현황</p>
         </div>
-        {empSession?.department_id && (
-          <button
-            onClick={() => navigate(`/department/dashboard?department=${empSession.department_id}`)}
-            className="flex items-center gap-1 text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
-          >
-            우리과 현황보기
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* 탭 */}
@@ -188,6 +173,22 @@ export default function VehicleDashboardPage() {
         {/* ── 대시보드 탭 ── */}
         {tab === 'dashboard' && (
           <div className="space-y-4">
+            {/* 누적 전체 요약 */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 mb-2">누적 전체</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: '총 운행 횟수', value: `${totalCountAll}회`, color: 'text-blue-600' },
+                  { label: '총 주행거리', value: `${totalDistanceAll.toLocaleString()}km`, color: 'text-green-600' },
+                ].map(c => (
+                  <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
+                    <p className="text-xs text-gray-500 mb-1">{c.label}</p>
+                    <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* 이번 달 요약 */}
             <div>
               <p className="text-xs font-semibold text-gray-400 mb-2">
@@ -195,10 +196,9 @@ export default function VehicleDashboardPage() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: '총 운행 횟수', value: `${thisMonthRecords?.length ?? 0}회`, color: 'text-blue-600' },
-                  { label: '총 주행거리', value: `${thisMonthDist.toLocaleString()}km`, color: 'text-green-600' },
-                  { label: '총 주유량', value: `${thisMonthFuel.toFixed(1)}L`, color: 'text-orange-500' },
-                  { label: '현재 계기판', value: latestOdometer != null ? `${latestOdometer.toLocaleString()}km` : '-', color: 'text-purple-600' },
+                  { label: '이번 달 운행', value: `${thisMonthRecords?.length ?? 0}회`, color: 'text-blue-600' },
+                  { label: '이번 달 주행거리', value: `${thisMonthDist.toLocaleString()}km`, color: 'text-green-600' },
+                  { label: '이번 달 주유량', value: `${thisMonthFuel.toFixed(1)}L`, color: 'text-orange-500' },
                 ].map(c => (
                   <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
                     <p className="text-xs text-gray-500 mb-1">{c.label}</p>
@@ -217,7 +217,7 @@ export default function VehicleDashboardPage() {
                 <div className="py-8 text-center text-sm text-gray-400">운행 기록이 없습니다</div>
               ) : (
                 <div className="space-y-2">
-                  {allRecords.slice(0, 5).map(r => (
+                  {allRecords.slice(0, 5).map((r: RecordItem) => (
                     <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
                       <div className="flex items-start justify-between mb-1.5">
                         <div>
@@ -260,35 +260,41 @@ export default function VehicleDashboardPage() {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-gray-400 mb-3">총 {allRecords.length}건</p>
-                {allRecords.map(r => (
-                  <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <span className="text-xs text-gray-400">{formatDateRange(r)}</span>
-                        <p className="text-sm font-semibold text-gray-900">{r.driver_name}</p>
+                {allRecords.map((r: RecordItem) => {
+                  const veh = (r as typeof r & { vehicles?: { name: string; license_plate: string } | null }).vehicles
+                  return (
+                    <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <span className="text-xs text-gray-400">{formatDateRange(r)}</span>
+                          <p className="text-sm font-semibold text-gray-900">{r.driver_name}</p>
+                          {veh && (
+                            <p className="text-xs text-gray-400 mt-0.5">{veh.name} · {veh.license_plate}</p>
+                          )}
+                        </div>
+                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+                          {r.purpose}
+                        </span>
                       </div>
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                        {r.purpose}
-                      </span>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
+                        {r.waypoint && <span>경유: {r.waypoint} →</span>}
+                        <span>{r.destination}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        {r.distance_traveled != null && (
+                          <span className="text-blue-600 font-medium">{r.distance_traveled}km</span>
+                        )}
+                        <span className="text-gray-400">누적 {r.cumulative_distance.toLocaleString()}km</span>
+                        {r.fuel_amount != null && (
+                          <span className="text-orange-500">{r.fuel_amount}L 주유</span>
+                        )}
+                        {r.duration_hours != null && (
+                          <span className="text-gray-400">{r.duration_hours}시간</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
-                      {r.waypoint && <span>경유: {r.waypoint} →</span>}
-                      <span>{r.destination}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      {r.distance_traveled != null && (
-                        <span className="text-blue-600 font-medium">{r.distance_traveled}km</span>
-                      )}
-                      <span className="text-gray-400">누적 {r.cumulative_distance.toLocaleString()}km</span>
-                      {r.fuel_amount != null && (
-                        <span className="text-orange-500">{r.fuel_amount}L 주유</span>
-                      )}
-                      {r.duration_hours != null && (
-                        <span className="text-gray-400">{r.duration_hours}시간</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -297,7 +303,6 @@ export default function VehicleDashboardPage() {
         {/* ── 통계 탭 ── */}
         {tab === 'stats' && (
           <div>
-            {/* 월 선택 */}
             <div className="flex items-center gap-2 mb-5">
               <select
                 value={year}
@@ -319,7 +324,6 @@ export default function VehicleDashboardPage() {
               </select>
             </div>
 
-            {/* 요약 카드 */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
                 { label: '총 운행 횟수', value: `${monthRecords?.length ?? 0}회`, color: 'text-blue-600' },
@@ -334,7 +338,6 @@ export default function VehicleDashboardPage() {
               ))}
             </div>
 
-            {/* 운전자별 운행 건수 */}
             <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행 건수</h3>
               {driverChartData.length > 0 ? (
@@ -352,7 +355,6 @@ export default function VehicleDashboardPage() {
               )}
             </div>
 
-            {/* 운전자별 운행거리 */}
             <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행거리</h3>
               {driverChartData.length > 0 ? (
@@ -370,7 +372,6 @@ export default function VehicleDashboardPage() {
               )}
             </div>
 
-            {/* 용무별 운행 횟수 */}
             <div className="bg-white rounded-xl border border-gray-100 p-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">용무별 운행 횟수</h3>
               {purposeChartData.length > 0 ? (

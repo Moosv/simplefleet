@@ -11,6 +11,7 @@ import RecordEntryPage from '@/pages/RecordEntryPage'
 import EmployeeLoginPage from '@/pages/EmployeeLoginPage'
 import EmployeeDashboardPage from '@/pages/EmployeeDashboardPage'
 import VehicleDashboardPage from '@/pages/VehicleDashboardPage'
+import DepartmentDashboardPage from '@/pages/DepartmentDashboardPage'
 
 // Operator pages
 import OperatorDashboardPage from '@/pages/operator/DashboardPage'
@@ -144,6 +145,7 @@ export default function App() {
             <Route path="/employee/record" element={<RecordEntryPage />} />
             <Route path="/employee/dashboard" element={<EmployeeDashboardPage />} />
             <Route path="/vehicle/dashboard" element={<VehicleDashboardPage />} />
+            <Route path="/department/dashboard" element={<DepartmentDashboardPage />} />
 
             {/* 시스템운영자 라우트 */}
             <Route path="/operator/dashboard" element={<OperatorPage><OperatorDashboardPage /></OperatorPage>} />
