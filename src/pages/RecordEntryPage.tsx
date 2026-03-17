@@ -11,6 +11,84 @@ import { cn } from '@/utils/cn'
 import { EMP_SESSION_KEY } from './EmployeeLoginPage'
 import type { EmpSession } from './EmployeeLoginPage'
 
+function TimeInput({
+  value,
+  onChange,
+  borderColor,
+  focusRingColor,
+  arrowColor,
+}: {
+  value: string
+  onChange: (v: string) => void
+  borderColor: string
+  focusRingColor: string
+  arrowColor: string
+}) {
+  const parts = value.split(':')
+  const hNum = Math.min(23, Math.max(0, parseInt(parts[0]) || 0))
+  const mNum = Math.min(59, Math.max(0, parseInt(parts[1]) || 0))
+
+  function update(h: number, m: number) {
+    const hh = String(Math.min(23, Math.max(0, h))).padStart(2, '0')
+    const mm = String(Math.min(59, Math.max(0, m))).padStart(2, '0')
+    onChange(`${hh}:${mm}`)
+  }
+
+  const chevronUp = (
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+  )
+  const chevronDown = (
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+  )
+
+  return (
+    <div className={`flex items-center justify-center gap-2 border-2 ${borderColor} rounded-xl bg-white py-3 px-3`}>
+      {/* Hour */}
+      <div className="flex flex-col items-center gap-1">
+        <button type="button" onClick={() => update(hNum + 1, mNum)}
+          className={`w-8 h-7 flex items-center justify-center rounded-lg ${arrowColor} transition-colors`}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{chevronUp}</svg>
+        </button>
+        <input
+          type="number" min={0} max={23}
+          value={String(hNum).padStart(2, '0')}
+          onChange={e => update(parseInt(e.target.value) || 0, mNum)}
+          inputMode="numeric"
+          className={`w-11 text-center text-2xl font-bold text-gray-800 bg-transparent focus:outline-none focus:ring-2 ${focusRingColor} rounded-lg py-0.5`}
+        />
+        <button type="button" onClick={() => update(hNum - 1, mNum)}
+          className={`w-8 h-7 flex items-center justify-center rounded-lg ${arrowColor} transition-colors`}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{chevronDown}</svg>
+        </button>
+        <span className="text-xs text-gray-400 font-medium">시</span>
+      </div>
+
+      {/* Colon */}
+      <span className="text-2xl font-bold text-gray-300 mb-5">:</span>
+
+      {/* Minute */}
+      <div className="flex flex-col items-center gap-1">
+        <button type="button" onClick={() => update(hNum, mNum + 1)}
+          className={`w-8 h-7 flex items-center justify-center rounded-lg ${arrowColor} transition-colors`}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{chevronUp}</svg>
+        </button>
+        <input
+          type="number" min={0} max={59}
+          value={String(mNum).padStart(2, '0')}
+          onChange={e => update(hNum, parseInt(e.target.value) || 0)}
+          inputMode="numeric"
+          className={`w-11 text-center text-2xl font-bold text-gray-800 bg-transparent focus:outline-none focus:ring-2 ${focusRingColor} rounded-lg py-0.5`}
+        />
+        <button type="button" onClick={() => update(hNum, mNum - 1)}
+          className={`w-8 h-7 flex items-center justify-center rounded-lg ${arrowColor} transition-colors`}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{chevronDown}</svg>
+        </button>
+        <span className="text-xs text-gray-400 font-medium">분</span>
+      </div>
+    </div>
+  )
+}
+
 const schema = z.object({
   vehicle_id: z.string().min(1, '차량을 선택하세요'),
   usage_date: z.string().min(1, '날짜를 선택하세요'),
@@ -64,18 +142,6 @@ export default function RecordEntryPage() {
   const [submitState, setSubmitState] = useState<SubmitState>('idle')
   const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; error: string | null }>({ distance: null, prev: null, error: null })
   const [distanceLoading, setDistanceLoading] = useState(false)
-
-  function formatTimeValue(newVal: string, prevVal: string): string {
-    const isDeleting = newVal.length < prevVal.length
-    const digits = newVal.replace(/\D/g, '').slice(0, 4)
-    if (isDeleting) {
-      return digits.length <= 2 ? digits : digits.slice(0, 2) + ':' + digits.slice(2)
-    }
-    if (digits.length === 0) return ''
-    if (digits.length <= 1) return digits
-    if (digits.length === 2) return digits + ':'
-    return digits.slice(0, 2) + ':' + digits.slice(2)
-  }
 
   const [tripType, setTripType] = useState<TripType>('none')
   const [tripEndDate, setTripEndDate] = useState('')
@@ -631,26 +697,22 @@ export default function RecordEntryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
+                  <TimeInput
                     value={tripStartTime}
-                    onChange={e => setTripStartTime(formatTimeValue(e.target.value, tripStartTime))}
-                    placeholder="예) 09:00"
-                    className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    onChange={setTripStartTime}
+                    borderColor="border-blue-200"
+                    focusRingColor="focus:ring-blue-400"
+                    arrowColor="text-blue-400 hover:bg-blue-100"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
+                  <TimeInput
                     value={tripEndTime}
-                    onChange={e => setTripEndTime(formatTimeValue(e.target.value, tripEndTime))}
-                    placeholder="예) 18:00"
-                    className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    onChange={setTripEndTime}
+                    borderColor="border-blue-200"
+                    focusRingColor="focus:ring-blue-400"
+                    arrowColor="text-blue-400 hover:bg-blue-100"
                   />
                 </div>
               </div>
@@ -770,26 +832,22 @@ export default function RecordEntryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
+                  <TimeInput
                     value={tripStartTime}
-                    onChange={e => setTripStartTime(formatTimeValue(e.target.value, tripStartTime))}
-                    placeholder="예) 09:00"
-                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                    onChange={setTripStartTime}
+                    borderColor="border-violet-200"
+                    focusRingColor="focus:ring-violet-400"
+                    arrowColor="text-violet-400 hover:bg-violet-100"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
+                  <TimeInput
                     value={tripEndTime}
-                    onChange={e => { setTripEndTime(formatTimeValue(e.target.value, tripEndTime)); setTripError('') }}
-                    placeholder="예) 18:00"
-                    className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                    onChange={v => { setTripEndTime(v); setTripError('') }}
+                    borderColor="border-violet-200"
+                    focusRingColor="focus:ring-violet-400"
+                    arrowColor="text-violet-400 hover:bg-violet-100"
                   />
                 </div>
               </div>
