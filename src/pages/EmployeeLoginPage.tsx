@@ -98,24 +98,26 @@ export default function EmployeeLoginPage() {
     setPlateError('')
   }
 
-  function handleVerify() {
-    if (!selectedPerson) return
+  const isVerified =
+    !!selectedPerson?.default_vehicle_id &&
+    !!selectedPerson?.licensePlate4 &&
+    plateInput.length === 4 &&
+    plateInput === selectedPerson.licensePlate4
 
+  function saveSessionAndGo(path: string) {
+    if (!selectedPerson) return
     if (!selectedPerson.default_vehicle_id || !selectedPerson.licensePlate4) {
       setPlateError('주 사용 차량이 등록되어 있지 않습니다. 관리자에게 문의하세요.')
       return
     }
-
     if (plateInput.length !== 4) {
       setPlateError('차량번호 끝 4자리를 입력하세요')
       return
     }
-
     if (plateInput !== selectedPerson.licensePlate4) {
       setPlateError('차량번호가 일치하지 않습니다')
       return
     }
-
     const session: EmpSession = {
       id: selectedPerson.id,
       name: selectedPerson.displayName,
@@ -124,7 +126,11 @@ export default function EmployeeLoginPage() {
       is_manager: selectedPerson.is_manager,
     }
     localStorage.setItem(EMP_SESSION_KEY, JSON.stringify(session))
-    navigate('/employee/record')
+    navigate(path)
+  }
+
+  function handleVerify() {
+    saveSessionAndGo('/employee/record')
   }
 
   // ─── 차량번호 인증 화면 ────────────────────────────────────────────────────
@@ -194,13 +200,30 @@ export default function EmployeeLoginPage() {
             )}
           </div>
 
-          <button
-            onClick={handleVerify}
-            disabled={plateInput.length !== 4}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            확인
-          </button>
+          {isVerified ? (
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleVerify}
+                className="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-semibold hover:bg-blue-700 transition-colors"
+              >
+                운행정보기록
+              </button>
+              <button
+                onClick={() => saveSessionAndGo(`/vehicle/dashboard?vehicle=${selectedPerson!.default_vehicle_id}`)}
+                className="w-full bg-white border border-gray-200 text-gray-700 py-4 rounded-xl text-base font-semibold hover:bg-gray-50 transition-colors"
+              >
+                대시보드 보기
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleVerify}
+              disabled={plateInput.length !== 4}
+              className="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              확인
+            </button>
+          )}
         </div>
       </div>
     )
