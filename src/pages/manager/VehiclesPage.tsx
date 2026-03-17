@@ -185,7 +185,7 @@ export default function ManagerVehiclesPage() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">차량명 *</label>
               <input type="text" value={name} onChange={e => setName(e.target.value)} required
-                placeholder="예) 1호차"
+                placeholder="예) 스마트테크"
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div>
