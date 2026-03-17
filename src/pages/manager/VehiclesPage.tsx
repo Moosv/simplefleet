@@ -79,6 +79,36 @@ function VehicleEditModal({
   )
 }
 
+function QRModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xs p-6 text-center">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-gray-900">차량 운행 기록 QR</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <img src="/qr-vehicle.png" alt="차량 운행 기록 QR" className="w-64 h-64 mx-auto" />
+        <p className="text-xs text-gray-400 mt-3">QR을 스캔하면 운행 기록 입력 페이지로 이동합니다</p>
+        <button
+          onClick={() => {
+            const link = document.createElement('a')
+            link.href = '/qr-vehicle.png'
+            link.download = 'qr-vehicle.png'
+            link.click()
+          }}
+          className="mt-4 w-full bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+        >
+          이미지 저장
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ManagerVehiclesPage() {
   const { profile } = useAuth()
   const { data: vehicles } = useVehicles(false)
@@ -88,6 +118,7 @@ export default function ManagerVehiclesPage() {
   const [plate, setPlate] = useState('')
   const [initialOdometer, setInitialOdometer] = useState('')
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
+  const [showQR, setShowQR] = useState(false)
 
   // 관리자의 소유 차량 (default_vehicle_id)
   const ownVehicleId = profile?.default_vehicle_id
@@ -120,15 +151,24 @@ export default function ManagerVehiclesPage() {
     },
   })
 
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase.from('vehicles').update({ is_active }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
+  })
+
   const deleteVehicle = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('vehicles').delete().eq('id', id)
       if (error) throw error
-      // default_vehicle_id 초기화
-      await supabase
-        .from('admin_profiles')
-        .update({ default_vehicle_id: null })
-        .eq('id', profile!.id)
+      if (id === ownVehicleId) {
+        await supabase
+          .from('admin_profiles')
+          .update({ default_vehicle_id: null })
+          .eq('id', profile!.id)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
@@ -226,25 +266,31 @@ export default function ManagerVehiclesPage() {
                 </span>
               </div>
 
-              <div className="flex gap-2">
-                {isOwn && (
-                  <>
-                    <button onClick={() => setEditingVehicle(vehicle)}
-                      className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">
-                      수정
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`'${vehicle.name}' 차량을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) {
-                          deleteVehicle.mutate(vehicle.id)
-                        }
-                      }}
-                      className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
-                    >
-                      삭제
-                    </button>
-                  </>
-                )}
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => setShowQR(true)}
+                  className="bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors">
+                  QR 보기
+                </button>
+                <button onClick={() => setEditingVehicle(vehicle)}
+                  className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">
+                  수정
+                </button>
+                <button
+                  onClick={() => toggleActive.mutate({ id: vehicle.id, is_active: !vehicle.is_active })}
+                  className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                >
+                  {vehicle.is_active ? '비활성화' : '활성화'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`'${vehicle.name}' 차량을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) {
+                      deleteVehicle.mutate(vehicle.id)
+                    }
+                  }}
+                  className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                >
+                  삭제
+                </button>
               </div>
 
             </div>
@@ -260,6 +306,7 @@ export default function ManagerVehiclesPage() {
       {editingVehicle && (
         <VehicleEditModal vehicle={editingVehicle} onClose={() => setEditingVehicle(null)} />
       )}
+      {showQR && <QRModal onClose={() => setShowQR(false)} />}
     </div>
   )
 }

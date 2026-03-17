@@ -253,12 +253,14 @@ export default function UsersPage() {
   // 관리자
   const { data: managers } = useQuery({
     queryKey: ['admin_profiles'],
+    staleTime: 0,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('admin_profiles')
         .select('*, departments(name), teams(id, name), vehicles(id, name)')
         .eq('role', 'department_manager')
         .order('created_at', { ascending: false })
+      if (error) throw error
       return (data as unknown as ManagerWithDept[]) ?? []
     },
   })

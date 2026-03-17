@@ -172,6 +172,7 @@ export default function ManagerRecordsPage() {
   const [driverFilter, setDriverFilter] = useState('') // "emp:{id}" | "name:{name}" | ""
   const [vehicleId, setVehicleId] = useState('')
   const [editingRecord, setEditingRecord] = useState<RecordWithJoins | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // 관리자의 주 사용 차량을 기본 필터로 설정
   useEffect(() => {
@@ -205,6 +206,16 @@ export default function ManagerRecordsPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard_dept_records'] })
     queryClient.invalidateQueries({ queryKey: ['recent_records'] })
     setEditingRecord(null)
+  }
+
+  async function handleDelete(id: string, driverName: string) {
+    if (!window.confirm(`'${driverName}'의 운행 기록을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return
+    setDeletingId(id)
+    await supabase.from('driving_records').delete().eq('id', id)
+    queryClient.invalidateQueries({ queryKey: ['driving_records'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard_dept_records'] })
+    queryClient.invalidateQueries({ queryKey: ['recent_records'] })
+    setDeletingId(null)
   }
 
   function exportToExcel() {
@@ -325,10 +336,19 @@ export default function ManagerRecordsPage() {
                   <td className="px-3 py-3 text-gray-600 text-xs whitespace-nowrap">{r.cumulative_distance.toLocaleString()}km</td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{r.fuel_amount != null ? `${r.fuel_amount}L` : '-'}</td>
                   <td className="px-3 py-3">
-                    <button onClick={() => setEditingRecord(r)}
-                      className="text-xs text-blue-500 hover:text-blue-700 transition-colors">
-                      수정
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditingRecord(r)}
+                        className="text-xs text-blue-500 hover:text-blue-700 transition-colors">
+                        수정
+                      </button>
+                      <button
+                        onClick={() => handleDelete(r.id, r.driver_name)}
+                        disabled={deletingId === r.id}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-40"
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
