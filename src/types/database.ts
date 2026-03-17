@@ -30,9 +30,9 @@ export type Database = {
         ]
       }
       vehicles: {
-        Row: { id: string; name: string; license_plate: string; is_active: boolean; created_at: string }
-        Insert: { id?: string; name: string; license_plate: string; is_active?: boolean; created_at?: string }
-        Update: { id?: string; name?: string; license_plate?: string; is_active?: boolean; created_at?: string }
+        Row: { id: string; name: string; license_plate: string; is_active: boolean; initial_odometer: number | null; created_at: string }
+        Insert: { id?: string; name: string; license_plate: string; is_active?: boolean; initial_odometer?: number | null; created_at?: string }
+        Update: { id?: string; name?: string; license_plate?: string; is_active?: boolean; initial_odometer?: number | null; created_at?: string }
         Relationships: []
       }
       employees: {

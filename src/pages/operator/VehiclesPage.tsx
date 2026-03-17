@@ -17,9 +17,12 @@ function VehicleEditModal({
   const queryClient = useQueryClient()
   const [name, setName] = useState(vehicle.name)
   const [plate, setPlate] = useState(vehicle.license_plate)
+  const [initialOdometer, setInitialOdometer] = useState(
+    vehicle.initial_odometer != null ? String(vehicle.initial_odometer) : ''
+  )
 
   const updateVehicle = useMutation({
-    mutationFn: async (data: { name: string; license_plate: string }) => {
+    mutationFn: async (data: { name: string; license_plate: string; initial_odometer: number | null }) => {
       const { error } = await supabase.from('vehicles').update(data).eq('id', vehicle.id)
       if (error) throw error
     },
@@ -36,43 +39,39 @@ function VehicleEditModal({
         <form
           onSubmit={e => {
             e.preventDefault()
-            updateVehicle.mutate({ name: name.trim(), license_plate: plate.trim() })
+            updateVehicle.mutate({
+              name: name.trim(),
+              license_plate: plate.trim(),
+              initial_odometer: initialOdometer !== '' ? Number(initialOdometer) : null,
+            })
           }}
           className="space-y-4"
         >
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">차량명</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} required
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">차량번호</label>
-            <input
-              type="text"
-              value={plate}
-              onChange={e => setPlate(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={plate} onChange={e => setPlate(e.target.value)} required
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">최초 계기판 (km)</label>
+            <input type="number" step="0.1" value={initialOdometer}
+              onChange={e => setInitialOdometer(e.target.value)}
+              placeholder="예) 12500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <p className="mt-1 text-xs text-gray-400">인수 당시 계기판 수치. 첫 운행거리 계산 기준이 됩니다.</p>
           </div>
           <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={updateVehicle.isPending}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
+            <button type="submit" disabled={updateVehicle.isPending}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
               {updateVehicle.isPending ? '저장 중...' : '저장'}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-            >
+            <button type="button" onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
               취소
             </button>
           </div>
@@ -88,12 +87,13 @@ export default function VehiclesPage() {
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [plate, setPlate] = useState('')
+  const [initialOdometer, setInitialOdometer] = useState('')
   const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null)
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
   const qrRef = useRef<HTMLDivElement>(null)
 
   const createVehicle = useMutation({
-    mutationFn: async (data: { name: string; license_plate: string }) => {
+    mutationFn: async (data: { name: string; license_plate: string; initial_odometer: number | null }) => {
       const { error } = await supabase.from('vehicles').insert(data)
       if (error) throw error
     },
@@ -101,6 +101,7 @@ export default function VehiclesPage() {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       setName('')
       setPlate('')
+      setInitialOdometer('')
       setShowForm(false)
     },
   })
@@ -150,48 +151,47 @@ export default function VehiclesPage() {
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5">
           <h3 className="text-sm font-semibold text-gray-800 mb-3">새 차량 등록</h3>
           <form
-            onSubmit={e => { e.preventDefault(); createVehicle.mutate({ name: name.trim(), license_plate: plate.trim() }) }}
+            onSubmit={e => {
+              e.preventDefault()
+              createVehicle.mutate({
+                name: name.trim(),
+                license_plate: plate.trim(),
+                initial_odometer: initialOdometer !== '' ? Number(initialOdometer) : null,
+              })
+            }}
             className="flex flex-wrap gap-3 items-end"
           >
             <div>
               <label className="block text-xs text-gray-500 mb-1">차량명 *</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required
                 placeholder="예) 1호차"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">차량번호 *</label>
-              <input
-                type="text"
-                value={plate}
-                onChange={e => setPlate(e.target.value)}
-                required
+              <input type="text" value={plate} onChange={e => setPlate(e.target.value)} required
                 placeholder="예) 146*"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">최초 계기판 (km)</label>
+              <input type="number" step="0.1" value={initialOdometer}
+                onChange={e => setInitialOdometer(e.target.value)}
+                placeholder="예) 12500"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-32" />
             </div>
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={createVehicle.isPending}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
+              <button type="submit" disabled={createVehicle.isPending}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
                 {createVehicle.isPending ? '저장 중...' : '추가'}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
-              >
+              <button type="button" onClick={() => setShowForm(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">
                 취소
               </button>
             </div>
           </form>
+          <p className="mt-2 text-xs text-gray-400">최초 계기판: 차량 인수 당시 계기판 수치 (첫 운행거리 자동 계산 기준)</p>
         </div>
       )}
 
@@ -202,6 +202,9 @@ export default function VehiclesPage() {
               <div>
                 <p className="font-semibold text-gray-900">{vehicle.name}</p>
                 <p className="text-sm text-gray-500">{vehicle.license_plate}</p>
+                {vehicle.initial_odometer != null && (
+                  <p className="text-xs text-gray-400 mt-0.5">최초 계기판 {vehicle.initial_odometer.toLocaleString()}km</p>
+                )}
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 vehicle.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
@@ -217,10 +220,8 @@ export default function VehiclesPage() {
               >
                 QR 보기
               </button>
-              <button
-                onClick={() => setEditingVehicle(vehicle)}
-                className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={() => setEditingVehicle(vehicle)}
+                className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">
                 수정
               </button>
               <button
