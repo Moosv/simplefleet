@@ -1,11 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { QRCodeCanvas } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { useVehicles } from '@/hooks/useEmployees'
 import type { Vehicle } from '@/types'
-
-const BASE_URL = window.location.origin
 
 function VehicleEditModal({
   vehicle,
@@ -88,9 +85,7 @@ export default function VehiclesPage() {
   const [name, setName] = useState('')
   const [plate, setPlate] = useState('')
   const [initialOdometer, setInitialOdometer] = useState('')
-  const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null)
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
-  const qrRef = useRef<HTMLDivElement>(null)
 
   const createVehicle = useMutation({
     mutationFn: async (data: { name: string; license_plate: string; initial_odometer: number | null }) => {
@@ -121,16 +116,6 @@ export default function VehiclesPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
   })
-
-  function downloadQR(vehicle: Vehicle) {
-    const canvas = qrRef.current?.querySelector('canvas')
-    if (!canvas) return
-    const url = canvas.toDataURL('image/png')
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `QR_${vehicle.name}_${vehicle.license_plate}.png`
-    a.click()
-  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -214,12 +199,6 @@ export default function VehiclesPage() {
             </div>
 
             <div className="flex gap-2">
-              <button
-                onClick={() => setQrVehicle(qrVehicle?.id === vehicle.id ? null : vehicle)}
-                className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
-              >
-                QR 보기
-              </button>
               <button onClick={() => setEditingVehicle(vehicle)}
                 className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">
                 수정
@@ -242,31 +221,6 @@ export default function VehiclesPage() {
               </button>
             </div>
 
-            {qrVehicle?.id === vehicle.id && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex flex-col items-center gap-3" ref={qrRef}>
-                  <QRCodeCanvas
-                    value={`${BASE_URL}/record?vehicle=${vehicle.id}`}
-                    size={160}
-                    level="M"
-                    includeMargin
-                  />
-                  <p className="text-xs text-gray-500 text-center break-all">
-                    {`${BASE_URL}/record?vehicle=${vehicle.id}`}
-                  </p>
-                  <button
-                    onClick={() => downloadQR(vehicle)}
-                    className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    PNG 다운로드
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         ))}
         {(!vehicles || vehicles.length === 0) && (
