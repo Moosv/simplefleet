@@ -51,9 +51,12 @@ export default function EmployeeDashboardPage() {
   const { data: records, isLoading } = useQuery({
     queryKey: ['emp_records', empSession.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_employee_records', {
-        p_employee_id: empSession!.id,
-      })
+      const { data, error } = await supabase
+        .from('driving_records')
+        .select('id, usage_date, driver_name, purpose, destination, waypoint, distance_traveled, cumulative_distance, fuel_amount, duration_hours')
+        .eq('employee_id', empSession!.id)
+        .order('usage_date', { ascending: false })
+        .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as EmpRecord[]
     },
