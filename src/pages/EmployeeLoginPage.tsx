@@ -224,6 +224,7 @@ export default function EmployeeLoginPage() {
               운행정보기록
             </button>
           )}
+          <p className="mt-6 text-center text-xs text-gray-300">SimpleFleet v1.1.3</p>
         </div>
       </div>
     )
@@ -324,6 +325,7 @@ export default function EmployeeLoginPage() {
         <p className="mt-6 text-center text-xs text-gray-400">
           이름이 목록에 없다면 관리자에게 등록을 요청하세요.
         </p>
+        <p className="mt-3 text-center text-xs text-gray-300">SimpleFleet v1.1.3</p>
       </div>
     </div>
   )
