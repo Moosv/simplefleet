@@ -169,8 +169,8 @@ export default function EmployeeLoginPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-1">차량번호를 입력하세요</h2>
             <p className="text-sm text-gray-500">
               {selectedPerson.vehicleName
-                ? `주 사용 차량(${selectedPerson.vehicleName})의 번호판 끝 4자리를 입력하세요.`
-                : '등록된 주 사용 차량의 번호판 끝 4자리를 입력하세요.'}
+                ? `등록된 주 사용 차량(${selectedPerson.vehicleName})의 번호 4자리를 입력하세요.`
+                : '등록된 주 사용 차량의 번호 4자리를 입력하세요.'}
             </p>
           </div>
 
@@ -185,7 +185,7 @@ export default function EmployeeLoginPage() {
                 setPlateError('')
               }}
               onKeyDown={e => e.key === 'Enter' && handleVerify()}
-              placeholder="예) 145*"
+              placeholder="예) 146*"
               autoFocus
               className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />

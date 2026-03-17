@@ -120,7 +120,12 @@ export default function RecordEntryPage() {
 
   // 운행시간 자동 계산 (당일/숙박 공통)
   useEffect(() => {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/
     if (tripType === 'none' || !usageDate || !tripStartTime || !tripEndTime) {
+      setCalculatedDuration(null)
+      return
+    }
+    if (!timeRegex.test(tripStartTime) || !timeRegex.test(tripEndTime)) {
       setCalculatedDuration(null)
       return
     }
@@ -615,18 +620,24 @@ export default function RecordEntryPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
                   <input
-                    type="time"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
                     value={tripStartTime}
                     onChange={e => setTripStartTime(e.target.value)}
+                    placeholder="예) 09:00"
                     className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
                   <input
-                    type="time"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
                     value={tripEndTime}
                     onChange={e => setTripEndTime(e.target.value)}
+                    placeholder="예) 18:00"
                     className="w-full px-3 py-3 border border-blue-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                 </div>
@@ -748,18 +759,24 @@ export default function RecordEntryPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">출발 시각</label>
                   <input
-                    type="time"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
                     value={tripStartTime}
                     onChange={e => setTripStartTime(e.target.value)}
+                    placeholder="예) 09:00"
                     className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">도착 시각</label>
                   <input
-                    type="time"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
                     value={tripEndTime}
                     onChange={e => { setTripEndTime(e.target.value); setTripError('') }}
+                    placeholder="예) 18:00"
                     className="w-full px-3 py-3 border border-violet-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                   />
                 </div>
