@@ -44,7 +44,7 @@ export default function OperatorDashboardPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('driving_records')
-        .select('driver_name, distance_traveled, fuel_amount, duration_hours')
+        .select('driver_name, distance_traveled, fuel_amount, duration_hours, vehicles(name)')
       return data ?? []
     },
   })
@@ -80,14 +80,13 @@ export default function OperatorDashboardPage() {
   const totalFuel = allRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
 
   // 운전자별 집계
-  const driverMap = new Map<string, { trips: number; distance: number; fuel: number }>()
+  const driverMap = new Map<string, { trips: number; distance: number }>()
   for (const r of allRecords ?? []) {
     const key = r.driver_name
-    if (!driverMap.has(key)) driverMap.set(key, { trips: 0, distance: 0, fuel: 0 })
+    if (!driverMap.has(key)) driverMap.set(key, { trips: 0, distance: 0 })
     const d = driverMap.get(key)!
     d.trips += 1
     d.distance += r.distance_traveled ?? 0
-    d.fuel += r.fuel_amount ?? 0
   }
   const drivers = [...driverMap.entries()]
 
@@ -99,12 +98,25 @@ export default function OperatorDashboardPage() {
     ? drivers.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
     : null
 
-  const fuelDrivers = drivers.filter(([, v]) => v.fuel > 0 && v.distance > 0)
-  const sortedByFuel = [...fuelDrivers].sort(
-    (a, b) => b[1].distance / b[1].fuel - a[1].distance / a[1].fuel
-  )
-  const bestFuelDriver = sortedByFuel[0] ?? null
-  const worstFuelDriver = sortedByFuel[sortedByFuel.length - 1] ?? null
+  // 차량별 집계
+  const vehicleMap = new Map<string, { trips: number; distance: number }>()
+  for (const r of allRecords ?? []) {
+    const veh = (r as typeof r & { vehicles?: { name: string } | null }).vehicles
+    const key = veh?.name ?? '(차량 미상)'
+    if (!vehicleMap.has(key)) vehicleMap.set(key, { trips: 0, distance: 0 })
+    const v = vehicleMap.get(key)!
+    v.trips += 1
+    v.distance += r.distance_traveled ?? 0
+  }
+  const vehicles = [...vehicleMap.entries()]
+
+  const mostTripsVehicle = vehicles.length
+    ? vehicles.reduce((a, b) => (b[1].trips > a[1].trips ? b : a))
+    : null
+
+  const longestVehicle = vehicles.length
+    ? vehicles.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
+    : null
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -141,45 +153,41 @@ export default function OperatorDashboardPage() {
         <StatCard title="누적 주유량" value={`${totalFuel.toFixed(1)}L`} color="text-orange-600" />
       </div>
 
-      {/* 운전자 어워드 */}
+      {/* 베스트 드라이버 */}
       <div className="mb-8">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">이달의 드라이버</h2>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">베스트 드라이버</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <AwardCard
-            emoji="⛽"
-            title="연비의 신"
-            name={bestFuelDriver ? bestFuelDriver[0] : null}
-            stat={bestFuelDriver
-              ? `${(bestFuelDriver[1].distance / bestFuelDriver[1].fuel).toFixed(1)} km/L`
-              : '데이터 없음'}
-            bgColor="border-emerald-100 bg-emerald-50"
-            textColor="text-emerald-600"
-          />
-          <AwardCard
-            emoji="🔥"
-            title="연비 파괴자"
-            name={worstFuelDriver && worstFuelDriver[0] !== bestFuelDriver?.[0] ? worstFuelDriver[0] : null}
-            stat={worstFuelDriver && worstFuelDriver[0] !== bestFuelDriver?.[0]
-              ? `${(worstFuelDriver[1].distance / worstFuelDriver[1].fuel).toFixed(1)} km/L`
-              : '데이터 없음'}
-            bgColor="border-red-100 bg-red-50"
-            textColor="text-red-500"
-          />
-          <AwardCard
             emoji="🏁"
-            title="최다 체크인"
+            title="최다 체크이너"
             name={mostTripsDriver ? mostTripsDriver[0] : null}
             stat={mostTripsDriver ? `총 ${mostTripsDriver[1].trips}회 운행` : '데이터 없음'}
             bgColor="border-blue-100 bg-blue-50"
             textColor="text-blue-600"
           />
           <AwardCard
+            emoji="🚗"
+            title="최다 체크인"
+            name={mostTripsVehicle ? mostTripsVehicle[0] : null}
+            stat={mostTripsVehicle ? `총 ${mostTripsVehicle[1].trips}회 운행` : '데이터 없음'}
+            bgColor="border-sky-100 bg-sky-50"
+            textColor="text-sky-600"
+          />
+          <AwardCard
             emoji="🛣️"
-            title="최장 마일리지"
+            title="최장 마일리저"
             name={longestDriver ? longestDriver[0] : null}
             stat={longestDriver ? `총 ${longestDriver[1].distance.toLocaleString()}km` : '데이터 없음'}
             bgColor="border-violet-100 bg-violet-50"
             textColor="text-violet-600"
+          />
+          <AwardCard
+            emoji="🚙"
+            title="최장 마일리지"
+            name={longestVehicle ? longestVehicle[0] : null}
+            stat={longestVehicle ? `총 ${longestVehicle[1].distance.toLocaleString()}km` : '데이터 없음'}
+            bgColor="border-indigo-100 bg-indigo-50"
+            textColor="text-indigo-600"
           />
         </div>
       </div>

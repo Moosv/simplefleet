@@ -101,6 +101,40 @@ export default function DepartmentDashboardPage() {
   const totalDistanceAll = allRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalCountAll = allRecords?.length ?? 0
 
+  // 베스트 드라이버 집계 (전체 기록 기준)
+  const driverMap = new Map<string, { trips: number; distance: number }>()
+  for (const r of allRecords ?? []) {
+    const key = r.driver_name
+    if (!driverMap.has(key)) driverMap.set(key, { trips: 0, distance: 0 })
+    const d = driverMap.get(key)!
+    d.trips += 1
+    d.distance += r.distance_traveled ?? 0
+  }
+  const driverEntries = [...driverMap.entries()]
+  const bestCheckinPerson = driverEntries.length
+    ? driverEntries.reduce((a, b) => (b[1].trips > a[1].trips ? b : a))
+    : null
+  const bestMileagePerson = driverEntries.length
+    ? driverEntries.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
+    : null
+
+  const vehicleMap2 = new Map<string, { trips: number; distance: number }>()
+  for (const r of allRecords ?? []) {
+    const veh = (r as typeof r & { vehicles?: { name: string } | null }).vehicles
+    const key = veh?.name ?? '(차량 미상)'
+    if (!vehicleMap2.has(key)) vehicleMap2.set(key, { trips: 0, distance: 0 })
+    const v = vehicleMap2.get(key)!
+    v.trips += 1
+    v.distance += r.distance_traveled ?? 0
+  }
+  const vehicleEntries = [...vehicleMap2.entries()]
+  const bestCheckinVehicle = vehicleEntries.length
+    ? vehicleEntries.reduce((a, b) => (b[1].trips > a[1].trips ? b : a))
+    : null
+  const bestMileageVehicle = vehicleEntries.length
+    ? vehicleEntries.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
+    : null
+
   // 이번 달 통계
   const thisMonthDist = thisMonthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const thisMonthFuel = thisMonthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
@@ -203,6 +237,56 @@ export default function DepartmentDashboardPage() {
                   <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
                     <p className="text-xs text-gray-500 mb-1">{c.label}</p>
                     <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 베스트 드라이버 */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 mb-2">베스트 드라이버</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    emoji: '🏁',
+                    title: '최다 체크이너',
+                    name: bestCheckinPerson?.[0] ?? null,
+                    stat: bestCheckinPerson ? `총 ${bestCheckinPerson[1].trips}회 운행` : '데이터 없음',
+                    bg: 'border-blue-100 bg-blue-50',
+                    text: 'text-blue-600',
+                  },
+                  {
+                    emoji: '🚗',
+                    title: '최다 체크인',
+                    name: bestCheckinVehicle?.[0] ?? null,
+                    stat: bestCheckinVehicle ? `총 ${bestCheckinVehicle[1].trips}회 운행` : '데이터 없음',
+                    bg: 'border-sky-100 bg-sky-50',
+                    text: 'text-sky-600',
+                  },
+                  {
+                    emoji: '🛣️',
+                    title: '최장 마일리저',
+                    name: bestMileagePerson?.[0] ?? null,
+                    stat: bestMileagePerson ? `총 ${bestMileagePerson[1].distance.toLocaleString()}km` : '데이터 없음',
+                    bg: 'border-violet-100 bg-violet-50',
+                    text: 'text-violet-600',
+                  },
+                  {
+                    emoji: '🚙',
+                    title: '최장 마일리지',
+                    name: bestMileageVehicle?.[0] ?? null,
+                    stat: bestMileageVehicle ? `총 ${bestMileageVehicle[1].distance.toLocaleString()}km` : '데이터 없음',
+                    bg: 'border-indigo-100 bg-indigo-50',
+                    text: 'text-indigo-600',
+                  },
+                ].map(c => (
+                  <div key={c.title} className={`rounded-xl border p-4 ${c.bg}`}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-base">{c.emoji}</span>
+                      <p className={`text-xs font-semibold ${c.text}`}>{c.title}</p>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 truncate">{c.name ?? '-'}</p>
+                    <p className={`text-xs mt-0.5 ${c.text}`}>{c.stat}</p>
                   </div>
                 ))}
               </div>
