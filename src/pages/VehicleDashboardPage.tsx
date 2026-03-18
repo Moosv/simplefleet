@@ -390,7 +390,7 @@ export default function VehicleDashboardPage() {
           </div>
         )}
       </div>
-      <p className="text-center text-xs text-gray-300 py-4">SimpleFleet v1.1.3</p>
+      <p className="text-center text-xs text-gray-300 py-4">SimpleFleet v1.1.5</p>
     </div>
   )
 }

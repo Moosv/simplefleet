@@ -209,24 +209,6 @@ export default function DepartmentDashboardPage() {
         {/* ── 대시보드 탭 ── */}
         {tab === 'dashboard' && (
           <div className="space-y-5">
-            {/* 누적 전체 통계 4개 */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 mb-2">전체 누적 현황</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: '누적 운행 횟수', value: `${totalCountAll}회`, color: 'text-blue-600' },
-                  { label: '누적 주행거리', value: `${totalDistanceAll.toLocaleString()}km`, color: 'text-green-600' },
-                  { label: '누적 운행시간', value: `${totalHoursAll.toFixed(1)}h`, color: 'text-purple-600' },
-                  { label: '누적 주유량', value: `${totalFuelAll.toFixed(1)}L`, color: 'text-orange-500' },
-                ].map(c => (
-                  <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
-                    <p className="text-xs text-gray-500 mb-1">{c.label}</p>
-                    <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* 베스트 드라이버 */}
             <div>
               <p className="text-xs font-semibold text-gray-400 mb-2">베스트 드라이버</p>
@@ -272,6 +254,24 @@ export default function DepartmentDashboardPage() {
                     </div>
                     <p className="text-sm font-bold text-gray-900 truncate">{c.name ?? '-'}</p>
                     <p className={`text-xs mt-0.5 ${c.text}`}>{c.stat}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 누적 전체 통계 4개 */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 mb-2">전체 누적 현황</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: '누적 운행 횟수', value: `${totalCountAll}회`, color: 'text-blue-600' },
+                  { label: '누적 주행거리', value: `${totalDistanceAll.toLocaleString()}km`, color: 'text-green-600' },
+                  { label: '누적 주유량', value: `${totalFuelAll.toFixed(1)}L`, color: 'text-orange-500' },
+                  { label: '총 운행 시간', value: `${totalHoursAll.toFixed(1)}h`, color: 'text-purple-600' },
+                ].map(c => (
+                  <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
+                    <p className="text-xs text-gray-500 mb-1">{c.label}</p>
+                    <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
                   </div>
                 ))}
               </div>
@@ -421,7 +421,7 @@ export default function DepartmentDashboardPage() {
           </div>
         )}
       </div>
-      <p className="text-center text-xs text-gray-300 py-4">SimpleFleet v1.1.3</p>
+      <p className="text-center text-xs text-gray-300 py-4">SimpleFleet v1.1.5</p>
     </div>
   )
 }
