@@ -77,25 +77,6 @@ export default function DepartmentDashboardPage() {
     staleTime: 0,
   })
 
-  // 이번 달 (대시보드용)
-  const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
-
-  const { data: thisMonthRecords } = useQuery({
-    queryKey: ['dept_thismonth', departmentId, thisMonthStart],
-    queryFn: async () => {
-      if (!departmentId) return []
-      const { data } = await supabase
-        .from('driving_records')
-        .select('driver_name, distance_traveled, fuel_amount, cumulative_distance')
-        .eq('department_id', departmentId)
-        .gte('usage_date', thisMonthStart)
-        .lte('usage_date', thisMonthEnd)
-      return data ?? []
-    },
-    enabled: !!departmentId,
-    staleTime: 0,
-  })
 
   // 누적 전체 통계
   const totalCountAll = allRecords?.length ?? 0
@@ -136,10 +117,6 @@ export default function DepartmentDashboardPage() {
   const bestMileageVehicle = vehicleEntries.length
     ? vehicleEntries.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
     : null
-
-  // 이번 달 통계
-  const thisMonthDist = thisMonthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
-  const thisMonthFuel = thisMonthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
 
   // 월별 통계
   const totalDistance = monthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
