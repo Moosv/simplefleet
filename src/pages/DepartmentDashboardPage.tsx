@@ -98,8 +98,10 @@ export default function DepartmentDashboardPage() {
   })
 
   // 누적 전체 통계
-  const totalDistanceAll = allRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalCountAll = allRecords?.length ?? 0
+  const totalDistanceAll = allRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
+  const totalHoursAll = allRecords?.reduce((s, r) => s + (r.duration_hours ?? 0), 0) ?? 0
+  const totalFuelAll = allRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
 
   // 베스트 드라이버 집계 (전체 기록 기준)
   const driverMap = new Map<string, { trips: number; distance: number }>()
@@ -206,33 +208,16 @@ export default function DepartmentDashboardPage() {
 
         {/* ── 대시보드 탭 ── */}
         {tab === 'dashboard' && (
-          <div className="space-y-4">
-            {/* 누적 전체 요약 */}
+          <div className="space-y-5">
+            {/* 누적 전체 통계 4개 */}
             <div>
-              <p className="text-xs font-semibold text-gray-400 mb-2">누적 전체</p>
+              <p className="text-xs font-semibold text-gray-400 mb-2">전체 누적 현황</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: '총 운행 횟수', value: `${totalCountAll}회`, color: 'text-blue-600' },
-                  { label: '총 주행거리', value: `${totalDistanceAll.toLocaleString()}km`, color: 'text-green-600' },
-                ].map(c => (
-                  <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
-                    <p className="text-xs text-gray-500 mb-1">{c.label}</p>
-                    <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 이번 달 요약 */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 mb-2">
-                이번 달 ({now.getFullYear()}년 {now.getMonth() + 1}월)
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: '이번 달 운행', value: `${thisMonthRecords?.length ?? 0}회`, color: 'text-blue-600' },
-                  { label: '이번 달 주행거리', value: `${thisMonthDist.toLocaleString()}km`, color: 'text-green-600' },
-                  { label: '이번 달 주유량', value: `${thisMonthFuel.toFixed(1)}L`, color: 'text-orange-500' },
+                  { label: '누적 운행 횟수', value: `${totalCountAll}회`, color: 'text-blue-600' },
+                  { label: '누적 주행거리', value: `${totalDistanceAll.toLocaleString()}km`, color: 'text-green-600' },
+                  { label: '누적 운행시간', value: `${totalHoursAll.toFixed(1)}h`, color: 'text-purple-600' },
+                  { label: '누적 주유량', value: `${totalFuelAll.toFixed(1)}L`, color: 'text-orange-500' },
                 ].map(c => (
                   <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
                     <p className="text-xs text-gray-500 mb-1">{c.label}</p>
@@ -292,45 +277,6 @@ export default function DepartmentDashboardPage() {
               </div>
             </div>
 
-            {/* 최근 운행 기록 */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 mb-2">최근 운행 기록</p>
-              {loadingRecords ? (
-                <div className="py-8 text-center text-sm text-gray-400">불러오는 중...</div>
-              ) : !allRecords || allRecords.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">운행 기록이 없습니다</div>
-              ) : (
-                <div className="space-y-2">
-                  {allRecords.slice(0, 5).map((r: RecordItem) => (
-                    <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                      <div className="flex items-start justify-between mb-1.5">
-                        <div>
-                          <span className="text-xs text-gray-400">{formatDateRange(r)}</span>
-                          <p className="text-sm font-semibold text-gray-900">{r.driver_name}</p>
-                        </div>
-                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                          {r.purpose}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
-                        <span>→ {r.destination}</span>
-                        {r.distance_traveled != null && (
-                          <span className="text-blue-600 font-medium">{r.distance_traveled}km</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {allRecords.length > 5 && (
-                    <button
-                      onClick={() => setTab('records')}
-                      className="w-full py-2.5 text-sm text-blue-600 font-medium bg-white border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      전체 {allRecords.length}건 보기 →
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
