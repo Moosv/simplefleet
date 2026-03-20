@@ -100,6 +100,11 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+        <div className="mt-6 text-center">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">
+            SimpleFleet v1.2.0
+          </span>
+        </div>
       </div>
     </div>
   )
