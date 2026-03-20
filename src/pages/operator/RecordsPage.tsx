@@ -230,11 +230,20 @@ function AddRecordModal({
     destination: '',
     cumulative_distance: '',
     fuel_amount: '',
-    duration_hours: '',
+    departure_time: '',
+    arrival_time: '',
   })
   const [saving, setSaving] = useState(false)
   const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; err: string | null }>({ distance: null, prev: null, err: null })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  function calcDuration(): number | null {
+    if (!form.usage_date || !form.departure_time || !form.arrival_time) return null
+    const dep = new Date(`${form.usage_date}T${form.departure_time}`)
+    const arr = new Date(`${form.end_date || form.usage_date}T${form.arrival_time}`)
+    const diff = (arr.getTime() - dep.getTime()) / (1000 * 60 * 60)
+    return diff > 0 ? Math.round(diff * 100) / 100 : null
+  }
 
   useEffect(() => {
     if (!form.vehicle_id || !form.cumulative_distance || isNaN(Number(form.cumulative_distance))) return
@@ -288,7 +297,7 @@ function AddRecordModal({
       cumulative_distance: cumulative,
       distance_traveled: distResult.distance,
       fuel_amount: form.fuel_amount ? Number(form.fuel_amount) : null,
-      duration_hours: form.duration_hours ? Number(form.duration_hours) : null,
+      duration_hours: calcDuration(),
     })
     setSaving(false)
     if (!error) onSave()
@@ -337,12 +346,29 @@ function AddRecordModal({
                 className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.usage_date ? 'border-red-300' : 'border-gray-200'}`} />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">출발시각</label>
+              <input type="time" value={form.departure_time}
+                onChange={e => setForm(f => ({ ...f, departure_time: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">도착일 <span className="text-gray-400 font-normal">(숙박 시)</span></label>
               <input type="date" value={form.end_date}
                 onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">도착시각</label>
+              <input type="time" value={form.arrival_time}
+                onChange={e => setForm(f => ({ ...f, arrival_time: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
+          {calcDuration() !== null && (
+            <p className="text-xs text-purple-600">운행시간 자동계산: {calcDuration()}시간</p>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">용무 <span className="text-red-400">*</span></label>
@@ -385,7 +411,7 @@ function AddRecordModal({
             <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km) <span className="text-red-400">*</span></label>
             <input type="number" step="0.1" value={form.cumulative_distance}
               onChange={e => setForm(f => ({ ...f, cumulative_distance: e.target.value }))}
-              placeholder="계기판 현재 숫자"
+              placeholder="당시 계기판 숫자"
               className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.cumulative_distance ? 'border-red-300' : 'border-gray-200'}`} />
             {errors.cumulative_distance && <p className="text-xs text-red-500 mt-0.5">{errors.cumulative_distance}</p>}
             {distanceInfo.distance !== null && (
@@ -397,21 +423,12 @@ function AddRecordModal({
             {distanceInfo.err && <p className="text-xs text-orange-500 mt-1">{distanceInfo.err}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">운행시간(h)</label>
-              <input type="number" step="0.5" min="0" value={form.duration_hours}
-                onChange={e => setForm(f => ({ ...f, duration_hours: e.target.value }))}
-                placeholder="선택사항"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">주유량(L)</label>
-              <input type="number" step="0.01" min="0" value={form.fuel_amount}
-                onChange={e => setForm(f => ({ ...f, fuel_amount: e.target.value }))}
-                placeholder="선택사항"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">주유량(L)</label>
+            <input type="number" step="0.01" min="0" value={form.fuel_amount}
+              onChange={e => setForm(f => ({ ...f, fuel_amount: e.target.value }))}
+              placeholder="선택사항"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
 
