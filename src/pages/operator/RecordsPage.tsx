@@ -204,6 +204,27 @@ function EditModal({
   )
 }
 
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+
+function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [h, m] = value ? value.split(':') : ['', '']
+  return (
+    <div className="flex gap-1">
+      <select value={h} onChange={e => onChange(`${e.target.value}:${m || '00'}`)}
+        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">시</option>
+        {HOURS.map(hh => <option key={hh} value={hh}>{hh}</option>)}
+      </select>
+      <select value={m} onChange={e => onChange(`${h || '00'}:${e.target.value}`)}
+        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">분</option>
+        {MINUTES.map(mm => <option key={mm} value={mm}>{mm}</option>)}
+      </select>
+    </div>
+  )
+}
+
 // 운행기록 추가 모달
 function AddRecordModal({
   onClose,
@@ -347,9 +368,7 @@ function AddRecordModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">출발시각</label>
-              <input type="time" value={form.departure_time}
-                onChange={e => setForm(f => ({ ...f, departure_time: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={form.departure_time} onChange={v => setForm(f => ({ ...f, departure_time: v }))} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -361,9 +380,7 @@ function AddRecordModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">도착시각</label>
-              <input type="time" value={form.arrival_time}
-                onChange={e => setForm(f => ({ ...f, arrival_time: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={form.arrival_time} onChange={v => setForm(f => ({ ...f, arrival_time: v }))} />
             </div>
           </div>
           {calcDuration() !== null && (
