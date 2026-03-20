@@ -171,13 +171,15 @@ export default function EmployeeLoginPage() {
             )}
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-1">차량번호를 입력하세요</h2>
-            <p className="text-sm text-gray-500">
-              {selectedPerson.vehicleName
-                ? `등록된 주 사용 차량(${selectedPerson.vehicleName})의 번호 4자리를 입력하세요.`
-                : '등록된 주 사용 차량의 번호 4자리를 입력하세요.'}
-            </p>
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-gray-900 mb-3">차량번호를 입력하세요</h2>
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5">
+              <p className="text-base font-bold text-blue-700 leading-snug">
+                {selectedPerson.vehicleName
+                  ? <>등록된 주 사용 차량<br /><span className="text-blue-500">({selectedPerson.vehicleName})</span>의<br />번호 끝 4자리를 입력하세요</>
+                  : <>등록된 주 사용 차량의<br />번호 끝 4자리를 입력하세요</>}
+              </p>
+            </div>
           </div>
 
           <div className="mb-4">
@@ -191,9 +193,9 @@ export default function EmployeeLoginPage() {
                 setPlateError('')
               }}
               onKeyDown={e => e.key === 'Enter' && handleVerify()}
-              placeholder="당신의 주 차량번호를 입력하세요 예) 146*"
+              placeholder="예) 146*"
               autoFocus
-              className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-gray-400"
+              className="w-full px-4 py-4 border-2 border-blue-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 bg-white"
             />
             {plateError && (
               <p className="mt-2 text-sm text-red-500 text-center">{plateError}</p>
