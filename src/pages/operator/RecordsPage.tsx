@@ -44,7 +44,9 @@ function EditModal({
   onSave: () => void
 }) {
   const { data: purposes } = usePurposes()
+  const { data: employees } = useEmployees(false)
   const [form, setForm] = useState({
+    driver_name: record.driver_name,
     usage_date: record.usage_date,
     end_date: record.end_date ?? '',
     purpose: record.purpose,
@@ -56,6 +58,10 @@ function EditModal({
   })
   const [saving, setSaving] = useState(false)
 
+  const purposeNames = purposes?.map(p => p.name) ?? []
+  const isCustomPurpose = purposeNames.length > 0 && !purposeNames.includes(form.purpose)
+  const selectPurposeValue = isCustomPurpose ? '기타' : form.purpose
+
   async function handleSave() {
     setSaving(true)
     const newCumulative = Number(form.cumulative_distance)
@@ -65,6 +71,7 @@ function EditModal({
     const { error } = await supabase
       .from('driving_records')
       .update({
+        driver_name: form.driver_name,
         usage_date: form.usage_date,
         end_date: form.end_date || null,
         purpose: form.purpose,
@@ -82,7 +89,7 @@ function EditModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-bold text-gray-900">운행 기록 수정</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -92,6 +99,21 @@ function EditModal({
           </button>
         </div>
         <div className="space-y-3">
+          {/* 운전자 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">운전자</label>
+            <input
+              type="text"
+              list="op-edit-employee-names"
+              value={form.driver_name}
+              onChange={e => setForm(f => ({ ...f, driver_name: e.target.value }))}
+              placeholder="운전자 이름"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <datalist id="op-edit-employee-names">
+              {employees?.map(e => <option key={e.id} value={e.name} />)}
+            </datalist>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">출발일</label>
@@ -108,11 +130,29 @@ function EditModal({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">용무</label>
-            <select value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <select
+              value={selectPurposeValue}
+              onChange={e => {
+                if (e.target.value === '기타') {
+                  setForm(f => ({ ...f, purpose: '' }))
+                } else {
+                  setForm(f => ({ ...f, purpose: e.target.value }))
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
               {purposes?.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-              <option value={form.purpose}>{form.purpose}</option>
+              <option value="기타">기타 (직접입력)</option>
             </select>
+            {(isCustomPurpose || selectPurposeValue === '기타') && (
+              <input
+                type="text"
+                value={form.purpose}
+                onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
+                placeholder="용무를 직접 입력하세요"
+                className="w-full mt-2 px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
