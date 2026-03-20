@@ -249,6 +249,15 @@ export default function RecordEntryPage() {
     }
   }, [selectedEmployeeId, employees, setValue, vehicleIdFromUrl])
 
+  // 직원 포털 세션: 차량 데이터 로드 후 주 사용 차량 명시적 설정
+  // (vehicles 비동기 로드 타이밍 문제로 defaultValues만으로는 select 반영 안 됨)
+  useEffect(() => {
+    if (!vehicles || !empSession?.default_vehicle_id || vehicleIdFromUrl) return
+    if (vehicles.find(v => v.id === empSession.default_vehicle_id)) {
+      setValue('vehicle_id', empSession.default_vehicle_id)
+    }
+  }, [vehicles, empSession?.default_vehicle_id, vehicleIdFromUrl, setValue])
+
   // 계기판 입력 시 주행거리 자동 계산
   useEffect(() => {
     if (!selectedVehicleId || !cumulativeDistance || isNaN(Number(cumulativeDistance))) return
