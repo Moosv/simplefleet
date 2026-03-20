@@ -206,16 +206,18 @@ function AddRecordModal({
   onClose,
   onSave,
   defaultDepartmentId,
+  defaultVehicleId,
 }: {
   onClose: () => void
   onSave: () => void
   defaultDepartmentId?: string
+  defaultVehicleId?: string
 }) {
   const { data: vehicles } = useVehicles(false)
   const { data: employees } = useEmployees(false)
   const { data: purposes } = usePurposes()
   const [form, setForm] = useState({
-    vehicle_id: '',
+    vehicle_id: defaultVehicleId ?? '',
     employee_id: '',
     driver_name: '',
     department_id: defaultDepartmentId ?? '',
@@ -542,6 +544,7 @@ export default function ManagerRecordsPage() {
           onClose={() => setAddingRecord(false)}
           onSave={handleAddSaved}
           defaultDepartmentId={profile?.department_id ?? undefined}
+          defaultVehicleId={profile?.default_vehicle_id ?? undefined}
         />
       )}
 
