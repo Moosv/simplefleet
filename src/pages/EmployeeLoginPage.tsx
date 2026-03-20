@@ -191,9 +191,9 @@ export default function EmployeeLoginPage() {
                 setPlateError('')
               }}
               onKeyDown={e => e.key === 'Enter' && handleVerify()}
-              placeholder="예) 146*"
+              placeholder="당신의 주 차량번호를 입력하세요 예) 146*"
               autoFocus
-              className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-gray-400"
             />
             {plateError && (
               <p className="mt-2 text-sm text-red-500 text-center">{plateError}</p>
