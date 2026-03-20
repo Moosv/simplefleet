@@ -113,10 +113,16 @@ CREATE POLICY "driving_records_select_operator" ON driving_records
     OR (get_my_role() = 'department_manager' AND department_id = get_my_department())
   );
 
--- UPDATE: 운영자만
+-- UPDATE: 운영자 전체 + 관리자는 소속 부서만
 CREATE POLICY "driving_records_update_operator" ON driving_records
-  FOR UPDATE USING (get_my_role() = 'system_operator');
+  FOR UPDATE USING (
+    get_my_role() = 'system_operator'
+    OR (get_my_role() = 'department_manager' AND department_id = get_my_department())
+  );
 
--- DELETE: 운영자만
+-- DELETE: 운영자 전체 + 관리자는 소속 부서만
 CREATE POLICY "driving_records_delete_operator" ON driving_records
-  FOR DELETE USING (get_my_role() = 'system_operator');
+  FOR DELETE USING (
+    get_my_role() = 'system_operator'
+    OR (get_my_role() = 'department_manager' AND department_id = get_my_department())
+  );
