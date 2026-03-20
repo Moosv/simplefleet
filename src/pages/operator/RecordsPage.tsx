@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useRecords } from '@/hooks/useRecords'
 import { useDepartments, useEmployees, useVehicles, usePurposes } from '@/hooks/useEmployees'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
-import { calcDistanceTraveled } from '@/utils/distanceCalc'
+import { calcDistanceTraveled, toDateString } from '@/utils/distanceCalc'
 import type { DrivingRecord } from '@/types'
 
 type RecordWithJoins = DrivingRecord & {
@@ -204,6 +204,232 @@ function EditModal({
   )
 }
 
+// 운행기록 추가 모달
+function AddRecordModal({
+  onClose,
+  onSave,
+  defaultDepartmentId,
+}: {
+  onClose: () => void
+  onSave: () => void
+  defaultDepartmentId?: string
+}) {
+  const { data: vehicles } = useVehicles(false)
+  const { data: employees } = useEmployees(false)
+  const { data: purposes } = usePurposes()
+  const [form, setForm] = useState({
+    vehicle_id: '',
+    employee_id: '',
+    driver_name: '',
+    department_id: defaultDepartmentId ?? '',
+    usage_date: toDateString(),
+    end_date: '',
+    purpose: '',
+    custom_purpose: '',
+    waypoint: '',
+    destination: '',
+    cumulative_distance: '',
+    fuel_amount: '',
+    duration_hours: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [distanceInfo, setDistanceInfo] = useState<{ distance: number | null; prev: number | null; err: string | null }>({ distance: null, prev: null, err: null })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!form.vehicle_id || !form.cumulative_distance || isNaN(Number(form.cumulative_distance))) return
+    const t = setTimeout(async () => {
+      const result = await calcDistanceTraveled(form.vehicle_id, Number(form.cumulative_distance))
+      setDistanceInfo({ distance: result.distance, prev: result.prevOdometer, err: result.error })
+    }, 600)
+    return () => clearTimeout(t)
+  }, [form.vehicle_id, form.cumulative_distance])
+
+  function handleEmployeeChange(empId: string) {
+    const emp = employees?.find(e => e.id === empId)
+    setForm(f => ({
+      ...f,
+      employee_id: empId,
+      driver_name: emp?.name ?? f.driver_name,
+      department_id: emp?.department_id ?? f.department_id,
+      vehicle_id: f.vehicle_id || ((emp as typeof emp & { default_vehicle_id?: string })?.default_vehicle_id ?? ''),
+    }))
+  }
+
+  function validate() {
+    const e: Record<string, string> = {}
+    if (!form.vehicle_id) e.vehicle_id = '차량을 선택하세요'
+    if (!form.driver_name.trim()) e.driver_name = '운전자를 선택하세요'
+    if (!form.usage_date) e.usage_date = '날짜를 선택하세요'
+    if (!form.purpose) e.purpose = '용무를 선택하세요'
+    if (form.purpose === '기타' && !form.custom_purpose.trim()) e.custom_purpose = '용무를 입력하세요'
+    if (!form.destination.trim()) e.destination = '목적지를 입력하세요'
+    if (!form.cumulative_distance || Number(form.cumulative_distance) <= 0) e.cumulative_distance = '누적거리를 입력하세요'
+    return e
+  }
+
+  async function handleSave() {
+    const e = validate()
+    if (Object.keys(e).length > 0) { setErrors(e); return }
+    setSaving(true)
+    const finalPurpose = form.purpose === '기타' ? form.custom_purpose : form.purpose
+    const cumulative = Number(form.cumulative_distance)
+    const distResult = await calcDistanceTraveled(form.vehicle_id, cumulative)
+    const { error } = await supabase.from('driving_records').insert({
+      vehicle_id: form.vehicle_id,
+      employee_id: form.employee_id || null,
+      department_id: form.department_id || null,
+      driver_name: form.driver_name,
+      usage_date: form.usage_date,
+      end_date: form.end_date || null,
+      purpose: finalPurpose,
+      waypoint: form.waypoint || null,
+      destination: form.destination,
+      cumulative_distance: cumulative,
+      distance_traveled: distResult.distance,
+      fuel_amount: form.fuel_amount ? Number(form.fuel_amount) : null,
+      duration_hours: form.duration_hours ? Number(form.duration_hours) : null,
+    })
+    setSaving(false)
+    if (!error) onSave()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-gray-900">운행 기록 추가</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">차량 <span className="text-red-400">*</span></label>
+              <select value={form.vehicle_id}
+                onChange={e => setForm(f => ({ ...f, vehicle_id: e.target.value }))}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${errors.vehicle_id ? 'border-red-300' : 'border-gray-200'}`}>
+                <option value="">차량 선택</option>
+                {vehicles?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+              {errors.vehicle_id && <p className="text-xs text-red-500 mt-0.5">{errors.vehicle_id}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">운전자 <span className="text-red-400">*</span></label>
+              <select value={form.employee_id}
+                onChange={e => handleEmployeeChange(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${errors.driver_name ? 'border-red-300' : 'border-gray-200'}`}>
+                <option value="">운전자 선택</option>
+                {employees?.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              {errors.driver_name && <p className="text-xs text-red-500 mt-0.5">{errors.driver_name}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">출발일 <span className="text-red-400">*</span></label>
+              <input type="date" value={form.usage_date}
+                onChange={e => setForm(f => ({ ...f, usage_date: e.target.value }))}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.usage_date ? 'border-red-300' : 'border-gray-200'}`} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">도착일 <span className="text-gray-400 font-normal">(숙박 시)</span></label>
+              <input type="date" value={form.end_date}
+                onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">용무 <span className="text-red-400">*</span></label>
+            <select value={form.purpose}
+              onChange={e => setForm(f => ({ ...f, purpose: e.target.value, custom_purpose: '' }))}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${errors.purpose ? 'border-red-300' : 'border-gray-200'}`}>
+              <option value="">용무 선택</option>
+              {purposes?.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+              <option value="기타">기타 (직접입력)</option>
+            </select>
+            {form.purpose === '기타' && (
+              <input type="text" value={form.custom_purpose}
+                onChange={e => setForm(f => ({ ...f, custom_purpose: e.target.value }))}
+                placeholder="용무를 직접 입력하세요"
+                className={`w-full mt-2 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.custom_purpose ? 'border-red-300' : 'border-blue-200'}`} />
+            )}
+            {(errors.purpose || errors.custom_purpose) && (
+              <p className="text-xs text-red-500 mt-0.5">{errors.purpose || errors.custom_purpose}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">경유지</label>
+              <input type="text" value={form.waypoint}
+                onChange={e => setForm(f => ({ ...f, waypoint: e.target.value }))}
+                placeholder="선택사항"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">목적지 <span className="text-red-400">*</span></label>
+              <input type="text" value={form.destination}
+                onChange={e => setForm(f => ({ ...f, destination: e.target.value }))}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.destination ? 'border-red-300' : 'border-gray-200'}`} />
+              {errors.destination && <p className="text-xs text-red-500 mt-0.5">{errors.destination}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km) <span className="text-red-400">*</span></label>
+            <input type="number" step="0.1" value={form.cumulative_distance}
+              onChange={e => setForm(f => ({ ...f, cumulative_distance: e.target.value }))}
+              placeholder="계기판 현재 숫자"
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.cumulative_distance ? 'border-red-300' : 'border-gray-200'}`} />
+            {errors.cumulative_distance && <p className="text-xs text-red-500 mt-0.5">{errors.cumulative_distance}</p>}
+            {distanceInfo.distance !== null && (
+              <p className="text-xs text-blue-600 mt-1">
+                주행거리 {distanceInfo.distance}km
+                {distanceInfo.prev !== null && <span className="text-gray-400 ml-1">(이전 {distanceInfo.prev.toLocaleString()}km)</span>}
+              </p>
+            )}
+            {distanceInfo.err && <p className="text-xs text-orange-500 mt-1">{distanceInfo.err}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">운행시간(h)</label>
+              <input type="number" step="0.5" min="0" value={form.duration_hours}
+                onChange={e => setForm(f => ({ ...f, duration_hours: e.target.value }))}
+                placeholder="선택사항"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">주유량(L)</label>
+              <input type="number" step="0.01" min="0" value={form.fuel_amount}
+                onChange={e => setForm(f => ({ ...f, fuel_amount: e.target.value }))}
+                placeholder="선택사항"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            취소
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {saving ? '저장 중...' : '운행기록 추가'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function RecordsPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -211,6 +437,7 @@ export default function RecordsPage() {
   const [employeeId, setEmployeeId] = useState('')
   const [vehicleId, setVehicleId] = useState('')
   const [editingRecord, setEditingRecord] = useState<RecordWithJoins | null>(null)
+  const [addingRecord, setAddingRecord] = useState(false)
 
   const { data: records, isLoading } = useRecords({ startDate, endDate, departmentId, employeeId, vehicleId })
   const { data: departments } = useDepartments()
@@ -229,6 +456,13 @@ export default function RecordsPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard_all_records'] })
     queryClient.invalidateQueries({ queryKey: ['recent_records'] })
     setEditingRecord(null)
+  }
+
+  function handleAddSaved() {
+    queryClient.invalidateQueries({ queryKey: ['driving_records'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard_all_records'] })
+    queryClient.invalidateQueries({ queryKey: ['recent_records'] })
+    setAddingRecord(false)
   }
 
   function exportToExcel() {
@@ -261,19 +495,36 @@ export default function RecordsPage() {
           onSave={handleEditSaved}
         />
       )}
+      {addingRecord && (
+        <AddRecordModal
+          onClose={() => setAddingRecord(false)}
+          onSave={handleAddSaved}
+        />
+      )}
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-900">운행 기록 관리</h1>
-        <button
-          onClick={exportToExcel}
-          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          엑셀 다운로드
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAddingRecord(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            운행기록 추가
+          </button>
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            엑셀 다운로드
+          </button>
+        </div>
       </div>
 
       {/* 필터 — 부서, 차량, 운전자, 시작일, 종료일 */}
