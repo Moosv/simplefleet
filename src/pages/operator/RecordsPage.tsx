@@ -55,6 +55,7 @@ function EditModal({
     departure_time: record.departure_time ?? '',
     arrival_time: record.arrival_time ?? '',
     cumulative_distance: record.cumulative_distance.toString(),
+    distance_traveled: record.distance_traveled?.toString() ?? '',
     fuel_amount: record.fuel_amount?.toString() ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -90,7 +91,7 @@ function EditModal({
         arrival_time: form.arrival_time || null,
         duration_hours: calcDuration(),
         cumulative_distance: newCumulative,
-        distance_traveled: distResult.distance,
+        distance_traveled: form.distance_traveled !== '' ? Number(form.distance_traveled) : distResult.distance,
         fuel_amount: form.fuel_amount ? Number(form.fuel_amount) : null,
       })
       .eq('id', record.id)
@@ -192,11 +193,18 @@ function EditModal({
           {calcDuration() !== null && (
             <p className="text-xs text-purple-600">운행시간 자동계산: {calcDuration()}시간</p>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km)</label>
               <input type="number" step="0.1" value={form.cumulative_distance}
                 onChange={e => setForm(f => ({ ...f, cumulative_distance: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">운행거리(km)</label>
+              <input type="number" step="0.1" value={form.distance_traveled}
+                onChange={e => setForm(f => ({ ...f, distance_traveled: e.target.value }))}
+                placeholder="자동계산"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
