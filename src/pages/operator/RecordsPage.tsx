@@ -47,6 +47,7 @@ function EditModal({
   const { data: employees } = useEmployees(false)
   const [form, setForm] = useState({
     driver_name: record.driver_name,
+    employee_id: record.employee_id ?? '',
     usage_date: record.usage_date,
     end_date: record.end_date ?? '',
     purpose: record.purpose,
@@ -59,6 +60,11 @@ function EditModal({
     fuel_amount: record.fuel_amount?.toString() ?? '',
   })
   const [saving, setSaving] = useState(false)
+
+  function handleDriverChange(name: string) {
+    const matched = employees?.find(e => e.name === name)
+    setForm(f => ({ ...f, driver_name: name, employee_id: matched?.id ?? '' }))
+  }
 
   const purposeNames = purposes?.map(p => p.name) ?? []
   const isCustomPurpose = purposeNames.length > 0 && !purposeNames.includes(form.purpose)
@@ -82,6 +88,7 @@ function EditModal({
       .from('driving_records')
       .update({
         driver_name: form.driver_name,
+        employee_id: form.employee_id || null,
         usage_date: form.usage_date,
         end_date: form.end_date || null,
         purpose: form.purpose,
@@ -118,7 +125,7 @@ function EditModal({
               type="text"
               list="op-edit-employee-names"
               value={form.driver_name}
-              onChange={e => setForm(f => ({ ...f, driver_name: e.target.value }))}
+              onChange={e => handleDriverChange(e.target.value)}
               placeholder="운전자 이름"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

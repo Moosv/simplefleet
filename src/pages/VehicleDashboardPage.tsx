@@ -86,6 +86,7 @@ function EditRecordModal({
     }))
   }
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [distInfo, setDistInfo] = useState<{ distance: number | null; prev: number | null }>({ distance: null, prev: null })
 
   const purposeNames = purposes?.map(p => p.name) ?? []
@@ -130,7 +131,11 @@ function EditRecordModal({
       fuel_amount: form.fuel_amount ? Number(form.fuel_amount) : null,
     }).eq('id', record.id)
     setSaving(false)
-    if (!error) onSave()
+    if (error) {
+      setSaveError('저장에 실패했습니다. 관리자에게 문의하세요.')
+    } else {
+      onSave()
+    }
   }
 
   return (
@@ -257,7 +262,11 @@ function EditRecordModal({
         </div>
 
         {/* 버튼 */}
-        <div className="px-5 pb-6 pt-2 flex gap-3">
+        <div className="px-5 pb-6 pt-2">
+        {saveError && (
+          <p className="text-xs text-red-500 text-center mb-3 bg-red-50 rounded-lg py-2">{saveError}</p>
+        )}
+        <div className="flex gap-3">
           <button onClick={onClose}
             className="flex-1 py-3.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors">
             취소
@@ -269,6 +278,7 @@ function EditRecordModal({
         </div>
       </div>
     </div>
+  </div>
   )
 }
 
