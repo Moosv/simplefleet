@@ -98,11 +98,7 @@ export default function EmployeeLoginPage() {
     setPlateError('')
   }
 
-  const isVerified =
-    !!selectedPerson?.default_vehicle_id &&
-    !!selectedPerson?.licensePlate4 &&
-    plateInput.length === 4 &&
-    plateInput === selectedPerson.licensePlate4
+
 
   function saveSessionAndGo(path: string) {
     if (!selectedPerson) return
@@ -172,13 +168,19 @@ export default function EmployeeLoginPage() {
           </div>
 
           <div className="mb-5">
-            <h2 className="text-xl font-bold text-gray-900 mb-3">차량번호를 입력하세요</h2>
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5">
-              <p className="text-base font-bold text-blue-700 leading-snug">
-                {selectedPerson.vehicleName
-                  ? <>등록된 주 사용 차량<br /><span className="text-blue-500">({selectedPerson.vehicleName})</span>의<br />번호 끝 4자리를 입력하세요</>
-                  : <>등록된 주 사용 차량의<br />번호 끝 4자리를 입력하세요</>}
-              </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-4 text-center">
+              {selectedPerson.vehicleName ? (
+                <p className="text-base font-bold leading-relaxed text-gray-700">
+                  <span className="text-blue-600">{selectedPerson.displayName}</span>님이<br />
+                  주로 사용하는 차량 "<span className="text-emerald-600">{selectedPerson.vehicleName}</span>"의<br />
+                  번호 끝자리를 입력하세요
+                </p>
+              ) : (
+                <p className="text-base font-bold leading-relaxed text-gray-700">
+                  <span className="text-blue-600">{selectedPerson.displayName}</span>님의<br />
+                  주 사용 차량 번호 끝자리를 입력하세요
+                </p>
+              )}
             </div>
           </div>
 
@@ -202,22 +204,7 @@ export default function EmployeeLoginPage() {
             )}
           </div>
 
-          {isVerified ? (
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={handleVerify}
-                className="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-semibold hover:bg-blue-700 transition-colors"
-              >
-                운행정보기록
-              </button>
-              <button
-                onClick={() => saveSessionAndGo(`/vehicle/dashboard?vehicle=${selectedPerson!.default_vehicle_id}`)}
-                className="w-full bg-white border border-gray-200 text-gray-700 py-4 rounded-xl text-base font-semibold hover:bg-gray-50 transition-colors"
-              >
-                대시보드 보기
-              </button>
-            </div>
-          ) : (
+          <div className="flex flex-col gap-3">
             <button
               onClick={handleVerify}
               disabled={plateInput.length !== 4}
@@ -225,7 +212,14 @@ export default function EmployeeLoginPage() {
             >
               운행정보기록
             </button>
-          )}
+            <button
+              onClick={() => saveSessionAndGo(`/vehicle/dashboard?vehicle=${selectedPerson!.default_vehicle_id}`)}
+              disabled={plateInput.length !== 4}
+              className="w-full bg-emerald-500 text-white py-4 rounded-xl text-base font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              대시보드 &amp; 운행기록 보기
+            </button>
+          </div>
           <div className="mt-6 text-center">
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.0</span>
           </div>
