@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { usePurposes } from '@/hooks/useEmployees'
+import { usePurposes, useEmployees } from '@/hooks/useEmployees'
 import { calcDistanceTraveled } from '@/utils/distanceCalc'
 import { EMP_SESSION_KEY } from './EmployeeLoginPage'
 import type { EmpSession } from './EmployeeLoginPage'
@@ -37,6 +37,8 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) 
 type EditableRecord = {
   id: string
   vehicle_id: string | null
+  employee_id: string | null
+  driver_name: string
   usage_date: string
   end_date: string | null
   departure_time: string | null
@@ -60,7 +62,10 @@ function EditRecordModal({
   onSave: () => void
 }) {
   const { data: purposes } = usePurposes()
+  const { data: employees } = useEmployees(true)
   const [form, setForm] = useState({
+    driver_name: record.driver_name,
+    employee_id: record.employee_id ?? '',
     purpose: record.purpose,
     waypoint: record.waypoint ?? '',
     destination: record.destination,
@@ -70,6 +75,16 @@ function EditRecordModal({
     distance_traveled: record.distance_traveled?.toString() ?? '',
     fuel_amount: record.fuel_amount?.toString() ?? '',
   })
+
+  // 운전자 이름 변경 시 employee_id 자동 연결
+  function handleDriverChange(name: string) {
+    const matched = employees?.find(e => e.name === name)
+    setForm(f => ({
+      ...f,
+      driver_name: name,
+      employee_id: matched?.id ?? '',
+    }))
+  }
   const [saving, setSaving] = useState(false)
   const [distInfo, setDistInfo] = useState<{ distance: number | null; prev: number | null }>({ distance: null, prev: null })
 
@@ -102,6 +117,8 @@ function EditRecordModal({
       : { distance: null }
     const finalDistance = form.distance_traveled !== '' ? Number(form.distance_traveled) : distResult.distance
     const { error } = await supabase.from('driving_records').update({
+      driver_name: form.driver_name,
+      employee_id: form.employee_id || null,
       purpose: form.purpose,
       waypoint: form.waypoint || null,
       destination: form.destination,
@@ -138,6 +155,26 @@ function EditRecordModal({
             <span className="font-medium text-gray-700">{record.usage_date}</span>
             {record.end_date && record.end_date !== record.usage_date && (
               <span> ~ {record.end_date}</span>
+            )}
+          </div>
+
+          {/* 운전자 */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">운전자</label>
+            <input
+              type="text"
+              list="vd-edit-employee-names"
+              value={form.driver_name}
+              onChange={e => handleDriverChange(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <datalist id="vd-edit-employee-names">
+              {employees?.map(e => <option key={e.id} value={e.name} />)}
+            </datalist>
+            {form.employee_id && (
+              <p className="text-xs text-blue-500 mt-1">
+                ✓ 등록된 직원 — 다음 수정 권한이 이 직원에게 부여됩니다
+              </p>
             )}
           </div>
 
@@ -506,6 +543,8 @@ export default function VehicleDashboardPage() {
                             onClick={() => setEditingRecord({
                               id: r.id,
                               vehicle_id: (r as any).vehicle_id ?? vehicleId,
+                              employee_id: (r as any).employee_id ?? null,
+                              driver_name: r.driver_name,
                               usage_date: r.usage_date,
                               end_date: r.end_date ?? null,
                               departure_time: (r as any).departure_time ?? null,
