@@ -248,7 +248,7 @@ export default function EmployeeLoginPage() {
 
       <div className="flex-1 max-w-lg mx-auto w-full px-4 pt-8">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">이름을 선택하세요</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">이름을 선택 또는 기입하세요</h2>
           <p className="text-sm text-gray-500">이름 선택 후 차량번호 끝 4자리로 본인 확인을 합니다.</p>
         </div>
 
