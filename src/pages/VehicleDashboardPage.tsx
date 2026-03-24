@@ -567,9 +567,9 @@ export default function VehicleDashboardPage() {
                               fuel_amount: r.fuel_amount ?? null,
                               duration_hours: r.duration_hours ?? null,
                             })}
-                            className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
+                            className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-1 rounded-lg transition-colors shadow-sm"
                           >
-                            수정
+                            ✏️ 수정
                           </button>
                         )}
                       </div>

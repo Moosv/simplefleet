@@ -219,6 +219,9 @@ export default function EmployeeLoginPage() {
             >
               대시보드 &amp; 운행기록 보기
             </button>
+            <p className="text-center text-xs text-emerald-600 font-medium">
+              ✏️ 본인의 운행기록을 수정할 수 있습니다.
+            </p>
           </div>
           <div className="mt-6 text-center">
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.0</span>
