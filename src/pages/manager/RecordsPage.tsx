@@ -657,21 +657,26 @@ export default function ManagerRecordsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['사용일자', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', ''].map(h => (
+                {['사용일자', '출발/도착', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', ''].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {isLoading && (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
               )}
               {!isLoading && records?.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
               )}
               {(records as unknown as RecordWithJoins[] | undefined)?.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 text-gray-700 text-xs whitespace-nowrap">{formatDateRange(r)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-gray-500 text-xs">
+                    {r.departure_time && r.arrival_time
+                      ? <>{r.departure_time}<br />{r.arrival_time}</>
+                      : '-'}
+                  </td>
                   <td className="px-3 py-3 font-medium text-gray-900">{r.driver_name}</td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{r.purpose}</td>
                   <td className="px-3 py-3 text-gray-500 text-xs max-w-20 truncate">{r.waypoint ?? '-'}</td>
