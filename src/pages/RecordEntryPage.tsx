@@ -89,6 +89,26 @@ function TimeInput({
   )
 }
 
+const TS_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const TS_MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [h, m] = value ? value.split(':') : ['', '']
+  return (
+    <div className="flex gap-1">
+      <select value={h} onChange={e => onChange(`${e.target.value}:${m || '00'}`)}
+        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">시</option>
+        {TS_HOURS.map(hh => <option key={hh} value={hh}>{hh}</option>)}
+      </select>
+      <select value={m} onChange={e => onChange(`${h || '00'}:${e.target.value}`)}
+        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">분</option>
+        {TS_MINUTES.map(mm => <option key={mm} value={mm}>{mm}</option>)}
+      </select>
+    </div>
+  )
+}
+
 const schema = z.object({
   vehicle_id: z.string().min(1, '차량을 선택하세요'),
   usage_date: z.string().min(1, '날짜를 선택하세요'),
@@ -161,7 +181,8 @@ export default function RecordEntryPage() {
   const [editSaved, setEditSaved] = useState(false)
   const [editForm, setEditForm] = useState<{
     purpose: string; destination: string; waypoint: string
-    cumulative_distance: string; fuel_amount: string; duration_hours: string
+    cumulative_distance: string; fuel_amount: string
+    departure_time: string; arrival_time: string
   } | null>(null)
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<FormData>({
@@ -381,6 +402,13 @@ export default function RecordEntryPage() {
       const distResult = submittedRecord?.vehicle_id
         ? await calcDistanceTraveled(submittedRecord.vehicle_id, newCumulative, submittedRecordId)
         : { distance: null }
+      const calcEditDuration = (): number | null => {
+        if (!submittedRecord?.usage_date || !editForm.departure_time || !editForm.arrival_time) return null
+        const dep = new Date(`${submittedRecord.usage_date}T${editForm.departure_time}`)
+        const arr = new Date(`${submittedRecord.end_date || submittedRecord.usage_date}T${editForm.arrival_time}`)
+        const diff = (arr.getTime() - dep.getTime()) / (1000 * 60 * 60)
+        return diff > 0 ? Math.round(diff * 100) / 100 : null
+      }
       await supabase.from('driving_records').update({
         purpose: editForm.purpose,
         destination: editForm.destination,
@@ -388,7 +416,9 @@ export default function RecordEntryPage() {
         cumulative_distance: newCumulative,
         distance_traveled: distResult.distance,
         fuel_amount: editForm.fuel_amount ? Number(editForm.fuel_amount) : null,
-        duration_hours: editForm.duration_hours ? Number(editForm.duration_hours) : null,
+        departure_time: editForm.departure_time || null,
+        arrival_time: editForm.arrival_time || null,
+        duration_hours: calcEditDuration(),
       }).eq('id', submittedRecordId)
       await refetchSubmitted()
       setEditSaved(true)
@@ -487,7 +517,8 @@ export default function RecordEntryPage() {
                         waypoint: r.waypoint ?? '',
                         cumulative_distance: String(r.cumulative_distance),
                         fuel_amount: r.fuel_amount != null ? String(r.fuel_amount) : '',
-                        duration_hours: r.duration_hours != null ? String(r.duration_hours) : '',
+                        departure_time: r.departure_time ?? '',
+                        arrival_time: r.arrival_time ?? '',
                       })
                       setSuccessView('edit')
                     }}
@@ -553,7 +584,26 @@ export default function RecordEntryPage() {
                     />
                   </div>
                 ))}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">출발시각</label>
+                    <TimeSelect value={editForm.departure_time}
+                      onChange={v => setEditForm(f => f ? { ...f, departure_time: v } : f)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">도착시각</label>
+                    <TimeSelect value={editForm.arrival_time}
+                      onChange={v => setEditForm(f => f ? { ...f, arrival_time: v } : f)} />
+                  </div>
+                </div>
+                {(() => {
+                  if (!editForm.departure_time || !editForm.arrival_time || !submittedRecord?.usage_date) return null
+                  const dep = new Date(`${submittedRecord.usage_date}T${editForm.departure_time}`)
+                  const arr = new Date(`${submittedRecord.end_date || submittedRecord.usage_date}T${editForm.arrival_time}`)
+                  const diff = Math.round((arr.getTime() - dep.getTime()) / (1000 * 60 * 60) * 100) / 100
+                  return diff > 0 ? <p className="text-xs text-purple-600">운행시간 자동계산: {diff}시간</p> : null
+                })()}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km)</label>
                     <input type="number" step="0.1" value={editForm.cumulative_distance}
@@ -564,12 +614,6 @@ export default function RecordEntryPage() {
                     <label className="block text-xs font-medium text-gray-500 mb-1">주유량(L)</label>
                     <input type="number" step="0.01" value={editForm.fuel_amount}
                       onChange={e => setEditForm(f => f ? { ...f, fuel_amount: e.target.value } : f)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">운행시간(h)</label>
-                    <input type="number" step="0.5" value={editForm.duration_hours}
-                      onChange={e => setEditForm(f => f ? { ...f, duration_hours: e.target.value } : f)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </div>

@@ -49,7 +49,8 @@ function EditModal({
     purpose: record.purpose,
     waypoint: record.waypoint ?? '',
     destination: record.destination,
-    duration_hours: record.duration_hours?.toString() ?? '',
+    departure_time: record.departure_time ?? '',
+    arrival_time: record.arrival_time ?? '',
     cumulative_distance: record.cumulative_distance.toString(),
     fuel_amount: record.fuel_amount?.toString() ?? '',
   })
@@ -58,6 +59,14 @@ function EditModal({
   const purposeNames = purposes?.map(p => p.name) ?? []
   const isCustomPurpose = purposeNames.length > 0 && !purposeNames.includes(form.purpose)
   const selectPurposeValue = isCustomPurpose ? '기타' : form.purpose
+
+  function calcDuration(): number | null {
+    if (!form.usage_date || !form.departure_time || !form.arrival_time) return null
+    const dep = new Date(`${form.usage_date}T${form.departure_time}`)
+    const arr = new Date(`${form.end_date || form.usage_date}T${form.arrival_time}`)
+    const diff = (arr.getTime() - dep.getTime()) / (1000 * 60 * 60)
+    return diff > 0 ? Math.round(diff * 100) / 100 : null
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -74,7 +83,9 @@ function EditModal({
         purpose: form.purpose,
         waypoint: form.waypoint || null,
         destination: form.destination,
-        duration_hours: form.duration_hours ? Number(form.duration_hours) : null,
+        departure_time: form.departure_time || null,
+        arrival_time: form.arrival_time || null,
+        duration_hours: calcDuration(),
         cumulative_distance: newCumulative,
         distance_traveled: distResult.distance,
         fuel_amount: form.fuel_amount ? Number(form.fuel_amount) : null,
@@ -165,13 +176,20 @@ function EditModal({
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">운행시간(h)</label>
-              <input type="number" step="0.5" value={form.duration_hours}
-                onChange={e => setForm(f => ({ ...f, duration_hours: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-xs font-medium text-gray-500 mb-1">출발시각</label>
+              <TimeSelect value={form.departure_time} onChange={v => setForm(f => ({ ...f, departure_time: v }))} />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">도착시각</label>
+              <TimeSelect value={form.arrival_time} onChange={v => setForm(f => ({ ...f, arrival_time: v }))} />
+            </div>
+          </div>
+          {calcDuration() !== null && (
+            <p className="text-xs text-purple-600">운행시간 자동계산: {calcDuration()}시간</p>
+          )}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">누적거리(km)</label>
               <input type="number" step="0.1" value={form.cumulative_distance}
