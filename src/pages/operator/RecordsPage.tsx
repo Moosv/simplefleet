@@ -204,7 +204,7 @@ function EditModal({
               <label className="block text-xs font-medium text-gray-500 mb-1">운행거리(km)</label>
               <input type="number" step="0.1" value={form.distance_traveled}
                 onChange={e => setForm(f => ({ ...f, distance_traveled: e.target.value }))}
-                placeholder="자동계산"
+                placeholder=""
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
