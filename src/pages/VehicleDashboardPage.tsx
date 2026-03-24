@@ -501,7 +501,7 @@ export default function VehicleDashboardPage() {
                         <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
                           {r.purpose}
                         </span>
-                        {(!empSession || (r as any).employee_id === empSession.id) && (
+                        {(empSession && (r as any).employee_id === empSession.id) && (
                           <button
                             onClick={() => setEditingRecord({
                               id: r.id,
