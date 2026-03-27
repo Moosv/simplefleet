@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -135,6 +135,7 @@ type TripType = 'none' | 'sameday' | 'overnight'
 export default function RecordEntryPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const vehicleIdFromUrl = searchParams.get('vehicle')
 
   // 직원 포털 세션 감지 (/employee/record 진입 시)
@@ -532,6 +533,10 @@ export default function RecordEntryPage() {
                       if (!submittedRecordId) return
                       if (!confirm('이 운행 기록을 삭제할까요?')) return
                       await supabase.from('driving_records').delete().eq('id', submittedRecordId)
+                      queryClient.invalidateQueries({ queryKey: ['driving_records'] })
+                      queryClient.invalidateQueries({ queryKey: ['vehicle_all_records'] })
+                      queryClient.invalidateQueries({ queryKey: ['vehicle_thismonth'] })
+                      queryClient.invalidateQueries({ queryKey: ['dept_all_records'] })
                       handleReset()
                     }}
                     className="text-xs px-3 py-1.5 bg-white border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors font-medium"
