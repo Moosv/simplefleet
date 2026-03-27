@@ -104,7 +104,7 @@ function EditRecordModal({
   useEffect(() => {
     if (!record.vehicle_id || !form.cumulative_distance || isNaN(Number(form.cumulative_distance))) return
     const t = setTimeout(async () => {
-      const result = await calcDistanceTraveled(record.vehicle_id!, Number(form.cumulative_distance), record.id)
+      const result = await calcDistanceTraveled(record.vehicle_id!, Number(form.cumulative_distance), record.id, record.usage_date)
       setDistInfo({ distance: result.distance, prev: result.prevOdometer ?? null })
     }, 600)
     return () => clearTimeout(t)
@@ -114,7 +114,7 @@ function EditRecordModal({
     setSaving(true)
     const newCumulative = Number(form.cumulative_distance)
     const distResult = record.vehicle_id
-      ? await calcDistanceTraveled(record.vehicle_id, newCumulative, record.id)
+      ? await calcDistanceTraveled(record.vehicle_id, newCumulative, record.id, record.usage_date)
       : { distance: null }
     const finalDistance = form.distance_traveled !== '' ? Number(form.distance_traveled) : distResult.distance
     const { error } = await supabase.from('driving_records').update({

@@ -169,6 +169,10 @@ export type Database = {
         Args: { p_vehicle_id: string }
         Returns: number | null
       }
+      get_prev_odometer_by_date: {
+        Args: { p_vehicle_id: string; p_usage_date?: string | null; p_exclude_id?: string | null }
+        Returns: number | null
+      }
       register_manager: {
         Args: { p_user_id: string; p_full_name: string; p_dept_id: string | null }
         Returns: void

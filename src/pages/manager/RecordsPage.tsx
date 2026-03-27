@@ -79,7 +79,7 @@ function EditModal({
     setSaving(true)
     const newCumulative = Number(form.cumulative_distance)
     const distResult = record.vehicle_id
-      ? await calcDistanceTraveled(record.vehicle_id, newCumulative, record.id)
+      ? await calcDistanceTraveled(record.vehicle_id, newCumulative, record.id, form.usage_date || undefined)
       : { distance: null }
     const { error } = await supabase
       .from('driving_records')
@@ -301,7 +301,7 @@ function AddRecordModal({
   useEffect(() => {
     if (!form.vehicle_id || !form.cumulative_distance || isNaN(Number(form.cumulative_distance))) return
     const t = setTimeout(async () => {
-      const result = await calcDistanceTraveled(form.vehicle_id, Number(form.cumulative_distance))
+      const result = await calcDistanceTraveled(form.vehicle_id, Number(form.cumulative_distance), undefined, form.usage_date || undefined)
       setDistanceInfo({ distance: result.distance, prev: result.prevOdometer, err: result.error })
     }, 600)
     return () => clearTimeout(t)
@@ -336,7 +336,7 @@ function AddRecordModal({
     setSaving(true)
     const finalPurpose = form.purpose === '기타' ? form.custom_purpose : form.purpose
     const cumulative = Number(form.cumulative_distance)
-    const distResult = await calcDistanceTraveled(form.vehicle_id, cumulative)
+    const distResult = await calcDistanceTraveled(form.vehicle_id, cumulative, undefined, form.usage_date || undefined)
     const { error } = await supabase.from('driving_records').insert({
       vehicle_id: form.vehicle_id,
       employee_id: form.employee_id || null,

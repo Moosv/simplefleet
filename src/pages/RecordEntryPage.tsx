@@ -284,7 +284,7 @@ export default function RecordEntryPage() {
     if (!selectedVehicleId || !cumulativeDistance || isNaN(Number(cumulativeDistance))) return
     const timeout = setTimeout(async () => {
       setDistanceLoading(true)
-      const result = await calcDistanceTraveled(selectedVehicleId, Number(cumulativeDistance))
+      const result = await calcDistanceTraveled(selectedVehicleId, Number(cumulativeDistance), undefined, usageDate || undefined)
       setDistanceInfo({ distance: result.distance, prev: result.prevOdometer, error: result.error })
       setDistanceLoading(false)
     }, 600)
@@ -337,7 +337,7 @@ export default function RecordEntryPage() {
     // 디바운스가 완료되지 않은 경우 동기적으로 재계산
     let finalDistance = distanceInfo.distance
     if (finalDistance === null && data.vehicle_id && data.cumulative_distance) {
-      const result = await calcDistanceTraveled(data.vehicle_id, Number(data.cumulative_distance))
+      const result = await calcDistanceTraveled(data.vehicle_id, Number(data.cumulative_distance), undefined, data.usage_date || undefined)
       if (result.error === null) finalDistance = result.distance
     }
 
@@ -400,7 +400,7 @@ export default function RecordEntryPage() {
       if (!submittedRecordId || !editForm) return
       const newCumulative = Number(editForm.cumulative_distance)
       const distResult = submittedRecord?.vehicle_id
-        ? await calcDistanceTraveled(submittedRecord.vehicle_id, newCumulative, submittedRecordId)
+        ? await calcDistanceTraveled(submittedRecord.vehicle_id, newCumulative, submittedRecordId, submittedRecord.usage_date || undefined)
         : { distance: null }
       const calcEditDuration = (): number | null => {
         if (!submittedRecord?.usage_date || !editForm.departure_time || !editForm.arrival_time) return null
