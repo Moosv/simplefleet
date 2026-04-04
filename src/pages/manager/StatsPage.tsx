@@ -1,47 +1,68 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/useAuth'
-import { useTeams } from '@/hooks/useEmployees'
+
+type YearValue = number | 'all'
+type MonthValue = number | 'all'
 
 export default function ManagerStatsPage() {
-  const { profile } = useAuth()
-  const { data: teams } = useTeams()
-  const teamName = teams?.find(t => t.id === profile?.team_id)?.name ?? ''
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState<YearValue>('all')
+  const [month, setMonth] = useState<MonthValue>('all')
 
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+  // 연도가 'all'로 바뀌면 월도 초기화
+  useEffect(() => {
+    if (year === 'all') setMonth('all')
+  }, [year])
 
+  const dateFilter = (() => {
+    if (year === 'all') return null
+    if (month === 'all') return { start: `${year}-01-01`, end: `${year}-12-31` }
+    const start = `${year}-${String(month).padStart(2, '0')}-01`
+    const end = new Date(year, month, 0).toISOString().split('T')[0]
+    return { start, end }
+  })()
+
+  const periodLabel = year === 'all'
+    ? '전체 기간'
+    : month === 'all'
+      ? `${year}년`
+      : `${year}년 ${month}월`
+
+  // 전체 데이터 조회 (팀 필터 없음 - 관리자는 모든 연구실 조회)
   const { data: records } = useQuery({
-    queryKey: ['manager_stats_records', year, month, profile?.team_id],
+    queryKey: ['manager_stats_records', year, month],
     queryFn: async () => {
-      if (!profile?.team_id) return []
-
-      // 관리자 연구실(팀) 소속 직원 ID 목록 조회
-      const { data: teamEmps } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('team_id', profile.team_id)
-      const teamEmpIds = teamEmps?.map(e => e.id) ?? []
-      if (teamEmpIds.length === 0) return []
-
-      const { data } = await supabase
+      let query = supabase
         .from('driving_records')
-        .select('*')
-        .gte('usage_date', monthStart)
-        .lte('usage_date', monthEnd)
-        .in('employee_id', teamEmpIds)
+        .select('*, employees(name, teams(name))')
+
+      if (dateFilter) {
+        query = query
+          .gte('usage_date', dateFilter.start)
+          .lte('usage_date', dateFilter.end)
+      }
+
+      const { data } = await query
       return data ?? []
     },
-    enabled: !!profile?.team_id,
   })
+
+  // 실(팀)별 집계
+  type RecordWithTeam = typeof records extends (infer T)[] | undefined ? T : never
+  const teamStats = records?.reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
+    const teamName = ((r as RecordWithTeam & { employees?: { teams?: { name: string } | null } | null })
+      .employees?.teams?.name) ?? '미설정'
+    if (!acc[teamName]) acc[teamName] = { 건수: 0, 거리: 0 }
+    acc[teamName].건수 += 1
+    acc[teamName].거리 += r.distance_traveled ?? 0
+    return acc
+  }, {})
+  const teamChartData = Object.entries(teamStats ?? {}).map(([name, v]) => ({ name, ...v }))
 
   // 용무별 집계
   const purposeStats = records?.reduce<Record<string, number>>((acc, r) => {
@@ -77,33 +98,41 @@ export default function ManagerStatsPage() {
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `${year}년${month}월`)
-    XLSX.writeFile(wb, `통계_${year}년${month}월.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, periodLabel)
+    XLSX.writeFile(wb, `통계_${periodLabel}.xlsx`)
   }
+
+  const selectClass = "px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h1 className="text-xl font-bold text-gray-900">
           통계 리포트
-          {teamName && <span className="ml-2 text-base font-normal text-gray-400">({teamName})</span>}
+          <span className="ml-2 text-base font-normal text-gray-400">({periodLabel})</span>
         </h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
+            {/* 연도 */}
             <select
               value={year}
-              onChange={e => setYear(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className={selectClass}
             >
+              <option value="all">전체 기간</option>
               {[2023, 2024, 2025, 2026].map(y => (
                 <option key={y} value={y}>{y}년</option>
               ))}
             </select>
+
+            {/* 월 - 연도 선택 시만 활성화 */}
             <select
               value={month}
-              onChange={e => setMonth(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              disabled={year === 'all'}
+              className={`${selectClass} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
+              <option value="all">전체</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                 <option key={m} value={m}>{m}월</option>
               ))}
@@ -136,6 +165,24 @@ export default function ManagerStatsPage() {
           </div>
         ))}
       </div>
+
+      {/* 실별 운행 현황 */}
+      {teamChartData.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-4">실별 운행 현황</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={teamChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="건수" fill="#ec4899" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="거리" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* 용무별 */}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -6,22 +6,46 @@ import {
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 
-export default function StatsPage() {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+type YearValue = number | 'all'
+type MonthValue = number | 'all'
 
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+export default function StatsPage() {
+  const [year, setYear] = useState<YearValue>('all')
+  const [month, setMonth] = useState<MonthValue>('all')
+
+  // 연도가 'all'로 바뀌면 월도 초기화
+  useEffect(() => {
+    if (year === 'all') setMonth('all')
+  }, [year])
+
+  const dateFilter = (() => {
+    if (year === 'all') return null
+    if (month === 'all') return { start: `${year}-01-01`, end: `${year}-12-31` }
+    const start = `${year}-${String(month).padStart(2, '0')}-01`
+    const end = new Date(year, month, 0).toISOString().split('T')[0]
+    return { start, end }
+  })()
+
+  const periodLabel = year === 'all'
+    ? '전체 기간'
+    : month === 'all'
+      ? `${year}년`
+      : `${year}년 ${month}월`
 
   const { data: records } = useQuery({
     queryKey: ['stats_records', year, month],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('driving_records')
         .select('*, departments(name), employees(name, teams(name))')
-        .gte('usage_date', monthStart)
-        .lte('usage_date', monthEnd)
+
+      if (dateFilter) {
+        query = query
+          .gte('usage_date', dateFilter.start)
+          .lte('usage_date', dateFilter.end)
+      }
+
+      const { data } = await query
       return data ?? []
     },
   })
@@ -74,8 +98,8 @@ export default function StatsPage() {
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `${year}년${month}월`)
-    XLSX.writeFile(wb, `통계_${year}년${month}월.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, periodLabel)
+    XLSX.writeFile(wb, `통계_${periodLabel}.xlsx`)
   }
 
   return (
@@ -86,18 +110,21 @@ export default function StatsPage() {
           <div className="flex items-center gap-2">
             <select
               value={year}
-              onChange={e => setYear(Number(e.target.value))}
+              onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
+              <option value="all">전체 기간</option>
               {[2023, 2024, 2025, 2026].map(y => (
                 <option key={y} value={y}>{y}년</option>
               ))}
             </select>
             <select
               value={month}
-              onChange={e => setMonth(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              disabled={year === 'all'}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
             >
+              <option value="all">전체</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                 <option key={m} value={m}>{m}월</option>
               ))}
