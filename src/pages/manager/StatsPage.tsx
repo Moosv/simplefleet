@@ -61,7 +61,9 @@ export default function ManagerStatsPage() {
     acc[teamName].거리 += r.distance_traveled ?? 0
     return acc
   }, {})
-  const teamChartData = Object.entries(teamStats ?? {}).map(([name, v]) => ({ name, ...v }))
+  const teamChartData = Object.entries(teamStats ?? {})
+    .filter(([name]) => name !== '미설정')
+    .map(([name, v]) => ({ name, ...v }))
 
   // 용무별 집계
   const purposeStats = records?.reduce<Record<string, number>>((acc, r) => {

@@ -78,7 +78,9 @@ export default function StatsPage() {
     acc[teamName].거리 += r.distance_traveled ?? 0
     return acc
   }, {})
-  const teamChartData = Object.entries(teamStats ?? {}).map(([name, v]) => ({ name, ...v }))
+  const teamChartData = Object.entries(teamStats ?? {})
+    .filter(([name]) => name !== '미설정')
+    .map(([name, v]) => ({ name, ...v }))
 
   const totalDistance = records?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalFuel = records?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
