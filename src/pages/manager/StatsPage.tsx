@@ -10,7 +10,6 @@ type YearValue = number | 'all'
 type MonthValue = number | 'all'
 
 export default function ManagerStatsPage() {
-  const now = new Date()
   const [year, setYear] = useState<YearValue>('all')
   const [month, setMonth] = useState<MonthValue>('all')
 
