@@ -10,7 +10,7 @@ type YearValue = number | 'all'
 type MonthValue = number | 'all'
 
 export default function StatsPage() {
-  const [year, setYear] = useState<YearValue>('all')
+  const [year, setYear] = useState<YearValue>(new Date().getFullYear())
   const [month, setMonth] = useState<MonthValue>('all')
 
   // 연도가 'all'로 바뀌면 월도 초기화
