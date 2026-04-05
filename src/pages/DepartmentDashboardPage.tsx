@@ -1,4 +1,20 @@
 import { useState, useEffect, type ReactNode } from 'react'
+
+type MonthValue = number | 'all'
+
+const TEAM_ORDER = ['숲푸드자원연구실', '스마트재배푸드테크연구실', '조경밀원자원연구실']
+const VEHICLE_ORDER = ['숲푸드트럭', '스마트달구지', '꿀벌붕붕카', '꿀벌 붕붕카']
+
+function sortByOrder<T extends { name: string }>(data: T[], order: string[]): T[] {
+  return [...data].sort((a, b) => {
+    const ai = order.findIndex(o => a.name === o || a.name.replace(/\s/g, '') === o.replace(/\s/g, ''))
+    const bi = order.findIndex(o => b.name === o || b.name.replace(/\s/g, '') === o.replace(/\s/g, ''))
+    if (ai === -1 && bi === -1) return 0
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -289,7 +305,7 @@ export default function DepartmentDashboardPage() {
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [month, setMonth] = useState<MonthValue>('all')
 
   const TABS: { key: Tab; label: ReactNode }[] = [
     { key: 'dashboard', label: '대시보드' },
@@ -330,9 +346,9 @@ export default function DepartmentDashboardPage() {
     staleTime: 0,
   })
 
-  // 통계용 월별 데이터
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+  // 통계용 데이터 (연도 전체 or 월별)
+  const statsStart = month === 'all' ? `${year}-01-01` : `${year}-${String(month).padStart(2, '0')}-01`
+  const statsEnd = month === 'all' ? `${year}-12-31` : new Date(year, month as number, 0).toISOString().split('T')[0]
 
   const { data: monthRecords } = useQuery({
     queryKey: ['dept_month_records', departmentId, year, month],
@@ -340,10 +356,10 @@ export default function DepartmentDashboardPage() {
       if (!departmentId) return []
       const { data } = await supabase
         .from('driving_records')
-        .select('driver_name, purpose, distance_traveled, fuel_amount')
+        .select('driver_name, purpose, distance_traveled, fuel_amount, vehicles(name), employees(name, teams(name))')
         .eq('department_id', departmentId)
-        .gte('usage_date', monthStart)
-        .lte('usage_date', monthEnd)
+        .gte('usage_date', statsStart)
+        .lte('usage_date', statsEnd)
       return data ?? []
     },
     enabled: !!departmentId,
@@ -390,24 +406,60 @@ export default function DepartmentDashboardPage() {
     ? vehicleEntries.reduce((a, b) => (b[1].distance > a[1].distance ? b : a))
     : null
 
-  // 월별 통계
+  // 통계 집계
+  type MR = NonNullable<typeof monthRecords>[number]
+
   const totalDistance = monthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
   const totalFuel = monthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
   const avgFuelEff = totalFuel > 0 ? (totalDistance / totalFuel).toFixed(1) : '-'
 
-  const driverStats = monthRecords?.reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
-    if (!acc[r.driver_name]) acc[r.driver_name] = { 건수: 0, 거리: 0 }
-    acc[r.driver_name].건수 += 1
-    acc[r.driver_name].거리 += r.distance_traveled ?? 0
-    return acc
-  }, {})
-  const driverChartData = Object.entries(driverStats ?? {}).map(([name, v]) => ({ name, ...v }))
+  // 실별
+  const teamChartData = sortByOrder(
+    Object.entries(
+      (monthRecords ?? []).reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
+        const name = ((r as MR & { employees?: { teams?: { name: string } | null } | null }).employees?.teams?.name) ?? null
+        if (!name) return acc
+        if (!acc[name]) acc[name] = { 건수: 0, 거리: 0 }
+        acc[name].건수 += 1
+        acc[name].거리 += r.distance_traveled ?? 0
+        return acc
+      }, {})
+    ).map(([name, v]) => ({ name, ...v })),
+    TEAM_ORDER
+  )
 
-  const purposeStats = monthRecords?.reduce<Record<string, number>>((acc, r) => {
-    acc[r.purpose] = (acc[r.purpose] ?? 0) + 1
-    return acc
-  }, {})
-  const purposeChartData = Object.entries(purposeStats ?? {}).map(([name, 건수]) => ({ name, 건수 }))
+  // 차량별
+  const vehicleChartData = sortByOrder(
+    Object.entries(
+      (monthRecords ?? []).reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
+        const name = ((r as MR & { vehicles?: { name: string } | null }).vehicles?.name) ?? null
+        if (!name) return acc
+        if (!acc[name]) acc[name] = { 건수: 0, 거리: 0 }
+        acc[name].건수 += 1
+        acc[name].거리 += r.distance_traveled ?? 0
+        return acc
+      }, {})
+    ).map(([name, v]) => ({ name, ...v })),
+    VEHICLE_ORDER
+  )
+
+  // 운전자별
+  const driverChartData = Object.entries(
+    (monthRecords ?? []).reduce<Record<string, { 건수: number; 거리: number }>>((acc, r) => {
+      if (!acc[r.driver_name]) acc[r.driver_name] = { 건수: 0, 거리: 0 }
+      acc[r.driver_name].건수 += 1
+      acc[r.driver_name].거리 += r.distance_traveled ?? 0
+      return acc
+    }, {})
+  ).map(([name, v]) => ({ name, ...v }))
+
+  // 용무별
+  const purposeChartData = Object.entries(
+    (monthRecords ?? []).reduce<Record<string, number>>((acc, r) => {
+      acc[r.purpose] = (acc[r.purpose] ?? 0) + 1
+      return acc
+    }, {})
+  ).map(([name, 건수]) => ({ name, 건수 })).sort((a, b) => b.건수 - a.건수)
 
   function formatDateRange(r: { usage_date: string; end_date?: string | null }) {
     if (r.end_date && r.end_date !== r.usage_date) return `${r.usage_date} ~ ${r.end_date}`
@@ -616,95 +668,119 @@ export default function DepartmentDashboardPage() {
         )}
 
         {/* ── 통계 탭 ── */}
-        {tab === 'stats' && (
-          <div>
-            <div className="flex items-center gap-2 mb-5">
-              <select
-                value={year}
-                onChange={e => setYear(Number(e.target.value))}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {[2024, 2025, 2026].map(y => (
-                  <option key={y} value={y}>{y}년</option>
+        {tab === 'stats' && (() => {
+          const noData = <div className="flex items-center justify-center text-sm text-gray-400" style={{ height: 160 }}>데이터 없음</div>
+          const selectClass = "px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+          function Chart({ data, dataKey, color, unit, formatter }: {
+            data: object[]
+            dataKey: string
+            color: string
+            unit?: string
+            formatter?: (v: unknown) => [string, string]
+          }) {
+            return (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={data} margin={{ top: 4, right: 10, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} unit={unit} allowDecimals={false} />
+                  <Tooltip formatter={formatter} />
+                  <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+
+          function Section({ title, data, distColor, cntColor }: {
+            title: string
+            data: { name: string; 거리: number; 건수: number }[]
+            distColor: string
+            cntColor: string
+          }) {
+            if (data.length === 0) return null
+            return (
+              <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">{title}</h3>
+                <p className="text-xs text-gray-400 mb-2">거리 (km)</p>
+                <Chart data={data} dataKey="거리" color={distColor} unit="km"
+                  formatter={(v) => [`${Number(v).toLocaleString()}km`, '거리']} />
+                <p className="text-xs text-gray-400 mt-3 mb-2">건수 (회)</p>
+                <Chart data={data} dataKey="건수" color={cntColor}
+                  formatter={(v) => [`${v}회`, '건수']} />
+              </div>
+            )
+          }
+
+          return (
+            <div>
+              {/* 연도/월 선택 */}
+              <div className="flex items-center gap-2 mb-4">
+                <select value={year} onChange={e => setYear(Number(e.target.value))} className={selectClass}>
+                  {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}년</option>)}
+                </select>
+                <select value={month} onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))} className={selectClass}>
+                  <option value="all">전체</option>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
+                </select>
+              </div>
+
+              {/* 요약 카드 */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {[
+                  { label: '총 운행 횟수', value: `${monthRecords?.length ?? 0}회`, color: 'text-blue-600' },
+                  { label: '총 주행거리', value: `${totalDistance.toLocaleString()}km`, color: 'text-green-600' },
+                  { label: '총 주유량', value: `${totalFuel.toFixed(1)}L`, color: 'text-orange-500' },
+                  { label: '평균 연비', value: avgFuelEff !== '-' ? `${avgFuelEff}km/L` : '-', color: 'text-purple-600' },
+                ].map(c => (
+                  <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-3">
+                    <p className="text-xs text-gray-500 mb-1">{c.label}</p>
+                    <p className={`text-base font-bold ${c.color}`}>{c.value}</p>
+                  </div>
                 ))}
-              </select>
-              <select
-                value={month}
-                onChange={e => setMonth(Number(e.target.value))}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{m}월</option>
-                ))}
-              </select>
-            </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              {[
-                { label: '총 운행 횟수', value: `${monthRecords?.length ?? 0}회`, color: 'text-blue-600' },
-                { label: '총 주행거리', value: `${totalDistance.toLocaleString()}km`, color: 'text-green-600' },
-                { label: '총 주유량', value: `${totalFuel.toFixed(1)}L`, color: 'text-orange-500' },
-                { label: '평균 연비', value: avgFuelEff !== '-' ? `${avgFuelEff}km/L` : '-', color: 'text-purple-600' },
-              ].map(c => (
-                <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
-                  <p className="text-xs text-gray-500 mb-1">{c.label}</p>
-                  <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
-                </div>
-              ))}
-            </div>
+              {/* 실별 사용 현황 */}
+              <Section title="실별 사용 현황" data={teamChartData} distColor="#ec4899" cntColor="#8b5cf6" />
 
-            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행 건수</h3>
-              {driverChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={driverChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="건수" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[180px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
-              )}
-            </div>
+              {/* 차량별 운행 현황 */}
+              <Section title="차량별 운행 현황" data={vehicleChartData} distColor="#06b6d4" cntColor="#f59e0b" />
 
-            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행거리</h3>
-              {driverChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={driverChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} unit="km" />
-                    <Tooltip formatter={(v) => [`${Number(v).toLocaleString()}km`, '운행거리']} />
-                    <Bar dataKey="거리" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[180px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">용무별 운행 횟수</h3>
+              {/* 용무별 운행 횟수 */}
               {purposeChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={purposeChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="건수" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">용무별 운행 횟수</h3>
+                  {noData && purposeChartData.length > 0
+                    ? <Chart data={purposeChartData} dataKey="건수" color="#8b5cf6" formatter={(v) => [`${v}회`, '건수']} />
+                    : noData}
+                </div>
               ) : (
-                <div className="h-[180px] flex items-center justify-center text-sm text-gray-400">데이터 없음</div>
+                <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">용무별 운행 횟수</h3>
+                  {noData}
+                </div>
+              )}
+
+              {/* 운전자별 운행 현황 */}
+              {driverChartData.length > 0 ? (
+                <div className="bg-white rounded-xl border border-gray-100 p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행 현황</h3>
+                  <p className="text-xs text-gray-400 mb-2">거리 (km)</p>
+                  <Chart data={driverChartData} dataKey="거리" color="#06b6d4" unit="km"
+                    formatter={(v) => [`${Number(v).toLocaleString()}km`, '거리']} />
+                  <p className="text-xs text-gray-400 mt-3 mb-2">건수 (회)</p>
+                  <Chart data={driverChartData} dataKey="건수" color="#f59e0b"
+                    formatter={(v) => [`${v}회`, '건수']} />
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-100 p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">운전자별 운행 현황</h3>
+                  {noData}
+                </div>
               )}
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       <div className="text-center py-4 space-y-1">
