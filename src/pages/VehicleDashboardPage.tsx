@@ -11,6 +11,7 @@ import { EMP_SESSION_KEY } from './EmployeeLoginPage'
 import type { EmpSession } from './EmployeeLoginPage'
 
 type Tab = 'dashboard' | 'records' | 'stats'
+type MonthValue = number | 'all'
 
 // ─── 24시간 시/분 셀렉트 ────────────────────────────────────────────────────
 const TS_H = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
@@ -296,7 +297,7 @@ export default function VehicleDashboardPage() {
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [month, setMonth] = useState<MonthValue>('all')
 
   // 차량 정보
   const { data: vehicle } = useQuery({
@@ -330,9 +331,13 @@ export default function VehicleDashboardPage() {
     staleTime: 0,
   })
 
-  // 통계용 월별 데이터
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+  // 통계용 데이터 (연도 전체 or 월별)
+  const statsStart = month === 'all'
+    ? `${year}-01-01`
+    : `${year}-${String(month).padStart(2, '0')}-01`
+  const statsEnd = month === 'all'
+    ? `${year}-12-31`
+    : new Date(year, month as number, 0).toISOString().split('T')[0]
 
   const { data: monthRecords } = useQuery({
     queryKey: ['vehicle_month_records', vehicleId, year, month],
@@ -342,28 +347,28 @@ export default function VehicleDashboardPage() {
         .from('driving_records')
         .select('driver_name, purpose, distance_traveled, fuel_amount')
         .eq('vehicle_id', vehicleId)
-        .gte('usage_date', monthStart)
-        .lte('usage_date', monthEnd)
+        .gte('usage_date', statsStart)
+        .lte('usage_date', statsEnd)
       return data ?? []
     },
     enabled: !!vehicleId,
     staleTime: 0,
   })
 
-  // 이번 달 통계 (대시보드용 - 현재 월 고정)
-  const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+  // 당해연도 통계 (대시보드용 - 현재 연도 고정)
+  const thisYearStart = `${now.getFullYear()}-01-01`
+  const thisYearEnd = `${now.getFullYear()}-12-31`
 
-  const { data: thisMonthRecords } = useQuery({
-    queryKey: ['vehicle_thismonth', vehicleId, thisMonthStart],
+  const { data: thisYearRecords } = useQuery({
+    queryKey: ['vehicle_thisyear', vehicleId, now.getFullYear()],
     queryFn: async () => {
       if (!vehicleId) return []
       const { data } = await supabase
         .from('driving_records')
         .select('driver_name, distance_traveled, fuel_amount, cumulative_distance')
         .eq('vehicle_id', vehicleId)
-        .gte('usage_date', thisMonthStart)
-        .lte('usage_date', thisMonthEnd)
+        .gte('usage_date', thisYearStart)
+        .lte('usage_date', thisYearEnd)
       return data ?? []
     },
     enabled: !!vehicleId,
@@ -389,9 +394,9 @@ export default function VehicleDashboardPage() {
   }, {})
   const purposeChartData = Object.entries(purposeStats ?? {}).map(([name, 건수]) => ({ name, 건수 }))
 
-  // 이번 달 요약 (대시보드)
-  const thisMonthDist = thisMonthRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
-  const thisMonthFuel = thisMonthRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
+  // 당해연도 요약 (대시보드)
+  const thisYearDist = thisYearRecords?.reduce((s, r) => s + (r.distance_traveled ?? 0), 0) ?? 0
+  const thisYearFuel = thisYearRecords?.reduce((s, r) => s + (r.fuel_amount ?? 0), 0) ?? 0
   const latestOdometer = allRecords?.[0]?.cumulative_distance ?? null
 
   function formatDateRange(r: { usage_date: string; end_date?: string | null }) {
@@ -401,7 +406,7 @@ export default function VehicleDashboardPage() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: '대시보드' },
-    { key: 'records', label: '운행기록' },
+    { key: 'records', label: '운행기록(수정가능)' },
     { key: 'stats', label: '통계' },
   ]
 
@@ -462,16 +467,16 @@ export default function VehicleDashboardPage() {
         {/* ── 대시보드 탭 ── */}
         {tab === 'dashboard' && (
           <div className="space-y-4">
-            {/* 이번 달 요약 */}
+            {/* 당해연도 요약 */}
             <div>
               <p className="text-xs font-semibold text-gray-400 mb-2">
-                이번 달 ({now.getFullYear()}년 {now.getMonth() + 1}월)
+                {now.getFullYear()}년 주사용차량(&quot;{vehicle?.name ?? '차량'}&quot;) 운행기록
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: '총 운행 횟수', value: `${thisMonthRecords?.length ?? 0}회`, color: 'text-blue-600' },
-                  { label: '총 주행거리', value: `${thisMonthDist.toLocaleString()}km`, color: 'text-green-600' },
-                  { label: '총 주유량', value: `${thisMonthFuel.toFixed(1)}L`, color: 'text-orange-500' },
+                  { label: '총 운행 횟수', value: `${thisYearRecords?.length ?? 0}회`, color: 'text-blue-600' },
+                  { label: '총 주행거리', value: `${thisYearDist.toLocaleString()}km`, color: 'text-green-600' },
+                  { label: '총 주유량', value: `${thisYearFuel.toFixed(1)}L`, color: 'text-orange-500' },
                   { label: '현재 계기판', value: latestOdometer != null ? `${latestOdometer.toLocaleString()}km` : '-', color: 'text-purple-600' },
                 ].map(c => (
                   <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
@@ -600,7 +605,7 @@ export default function VehicleDashboardPage() {
         {/* ── 통계 탭 ── */}
         {tab === 'stats' && (
           <div>
-            {/* 월 선택 */}
+            {/* 연도/월 선택 */}
             <div className="flex items-center gap-2 mb-5">
               <select
                 value={year}
@@ -613,9 +618,10 @@ export default function VehicleDashboardPage() {
               </select>
               <select
                 value={month}
-                onChange={e => setMonth(Number(e.target.value))}
+                onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
+                <option value="all">전체</option>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                   <option key={m} value={m}>{m}월</option>
                 ))}
@@ -704,7 +710,7 @@ export default function VehicleDashboardPage() {
           onClose={() => setEditingRecord(null)}
           onSave={() => {
             queryClient.invalidateQueries({ queryKey: ['vehicle_all_records', vehicleId] })
-            queryClient.invalidateQueries({ queryKey: ['vehicle_thismonth', vehicleId] })
+            queryClient.invalidateQueries({ queryKey: ['vehicle_thisyear', vehicleId] })
             setEditingRecord(null)
           }}
         />
