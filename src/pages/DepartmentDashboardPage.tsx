@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -291,9 +291,9 @@ export default function DepartmentDashboardPage() {
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
 
-  const TABS: { key: Tab; label: string }[] = [
+  const TABS: { key: Tab; label: ReactNode }[] = [
     { key: 'dashboard', label: '대시보드' },
-    { key: 'records', label: '운행기록' },
+    { key: 'records', label: <><div>운행기록</div><div className="text-[10px] font-normal">(수정가능)</div></> },
     { key: 'stats', label: '통계' },
   ]
 
@@ -412,6 +412,15 @@ export default function DepartmentDashboardPage() {
   function formatDateRange(r: { usage_date: string; end_date?: string | null }) {
     if (r.end_date && r.end_date !== r.usage_date) return `${r.usage_date} ~ ${r.end_date}`
     return r.usage_date
+  }
+
+  function vehicleColor(name: string | undefined): string {
+    if (!name) return 'text-gray-500 bg-gray-50 border-gray-200'
+    const n = name.replace(/\s/g, '')
+    if (n.includes('숲푸드트럭')) return 'text-green-700 bg-green-50 border-green-200'
+    if (n.includes('스마트달구지')) return 'text-blue-700 bg-blue-50 border-blue-200'
+    if (n.includes('꿀벌붕붕카')) return 'text-amber-700 bg-amber-50 border-amber-200'
+    return 'text-gray-500 bg-gray-50 border-gray-200'
   }
 
   type RecordItem = NonNullable<typeof allRecords>[number]
@@ -547,7 +556,9 @@ export default function DepartmentDashboardPage() {
                           <span className="text-xs text-gray-400">{formatDateRange(r)}</span>
                           <p className="text-sm font-semibold text-gray-900">{r.driver_name}</p>
                           {veh && (
-                            <p className="text-xs text-gray-400 mt-0.5">{veh.name} · {veh.license_plate}</p>
+                            <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full border mt-0.5 ${vehicleColor(veh.name)}`}>
+                              {veh.name}
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">

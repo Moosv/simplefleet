@@ -404,9 +404,9 @@ export default function VehicleDashboardPage() {
     return r.usage_date
   }
 
-  const TABS: { key: Tab; label: string }[] = [
+  const TABS: { key: Tab; label: React.ReactNode }[] = [
     { key: 'dashboard', label: '대시보드' },
-    { key: 'records', label: '운행기록(수정가능)' },
+    { key: 'records', label: <><div>운행기록</div><div className="text-[10px] font-normal">(수정가능)</div></> },
     { key: 'stats', label: '통계' },
   ]
 
@@ -433,7 +433,7 @@ export default function VehicleDashboardPage() {
         {empSession?.department_id && (
           <button
             onClick={() => navigate(`/department/dashboard?department=${empSession.department_id}`)}
-            className="flex items-center gap-1 text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
+            className="flex items-center gap-1 text-sm text-blue-600 font-semibold bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
           >
             우리과 현황보기
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -470,7 +470,7 @@ export default function VehicleDashboardPage() {
             {/* 당해연도 요약 */}
             <div>
               <p className="text-xs font-semibold text-gray-400 mb-2">
-                {now.getFullYear()}년 주사용차량(&quot;{vehicle?.name ?? '차량'}&quot;) 운행기록
+                {now.getFullYear()}년 <span className="text-blue-600">{vehicle?.name ?? '차량'}</span> 운행기록
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {[
