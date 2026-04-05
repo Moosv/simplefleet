@@ -102,7 +102,7 @@ export default function LoginPage() {
         </div>
         <div className="mt-6 text-center space-y-1">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">
-            SimpleFleet v1.2.5
+            SimpleFleet v1.2.8
           </span>
           <p className="text-xs text-gray-400">© 2026 MSKIM, All rights reserved.</p>
         </div>

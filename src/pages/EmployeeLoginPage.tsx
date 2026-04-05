@@ -224,7 +224,7 @@ export default function EmployeeLoginPage() {
             </p>
           </div>
           <div className="mt-6 text-center space-y-1">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.5</span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.8</span>
             <p className="text-xs text-gray-400">© 2026 MSKIM, All rights reserved.</p>
           </div>
         </div>
@@ -328,7 +328,7 @@ export default function EmployeeLoginPage() {
           이름이 목록에 없다면 관리자에게 등록을 요청하세요.
         </p>
         <div className="mt-3 text-center space-y-1">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.5</span>
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.8</span>
           <p className="text-xs text-gray-400">© 2026 MSKIM, All rights reserved.</p>
         </div>
       </div>

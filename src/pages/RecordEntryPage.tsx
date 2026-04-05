@@ -458,7 +458,7 @@ export default function RecordEntryPage() {
             <p className="text-gray-500 text-sm">운행 기록이 저장되었습니다.</p>
             <p className="text-gray-400 text-sm mt-1">수고하셨습니다. 좋은 하루 되세요 😊</p>
             <div className="mt-3 space-y-1">
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.5</span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">SimpleFleet v1.2.8</span>
               <p className="text-xs text-gray-400">© 2026 MSKIM, All rights reserved.</p>
             </div>
           </div>
