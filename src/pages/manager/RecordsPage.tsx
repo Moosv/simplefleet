@@ -5,7 +5,7 @@ import { useEmployees, useVehicles, usePurposes } from '@/hooks/useEmployees'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { calcDistanceTraveled, toDateString } from '@/utils/distanceCalc'
-import * as XLSX from 'xlsx'
+import { exportDrivingRecords, VEHICLE_MANAGER_MAP } from '@/utils/exportExcel'
 import type { DrivingRecord } from '@/types'
 
 type RecordWithJoins = DrivingRecord & {
@@ -563,21 +563,16 @@ export default function ManagerRecordsPage() {
 
   function exportToExcel() {
     if (!records) return
-    const rows = (records as unknown as RecordWithJoins[]).map(r => ({
-      '사용일자': formatDateRange(r),
-      '운전자': r.driver_name,
-      '용무': r.purpose,
-      '경유지': r.waypoint ?? '',
-      '목적지': r.destination,
-      '운행기간': formatTripPeriod(r),
-      '운행거리(km)': r.distance_traveled ?? '',
-      '누적거리(km)': r.cumulative_distance,
-      '주유량(L)': r.fuel_amount ?? '',
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '운행기록')
-    XLSX.writeFile(wb, `부서운행기록_${new Date().toISOString().split('T')[0]}.xlsx`)
+    const selectedVehicle = vehicles?.find(v => v.id === vehicleId)
+    const vehiclePlate = selectedVehicle?.license_plate ?? ''
+    const managerName = selectedVehicle ? (VEHICLE_MANAGER_MAP[selectedVehicle.name] ?? profile?.full_name ?? '') : (profile?.full_name ?? '')
+    const dateTag = (startDate && endDate) ? `${startDate}~${endDate}` : new Date().toISOString().split('T')[0]
+    exportDrivingRecords(records as unknown as Parameters<typeof exportDrivingRecords>[0], {
+      vehicleName: selectedVehicle?.name,
+      vehiclePlate,
+      managerName,
+      filename: `운행기록_${vehiclePlate || '전체'}_${dateTag}.xlsx`,
+    })
   }
 
   return (

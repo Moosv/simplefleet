@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { Navigate, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function LoginPage() {
@@ -14,8 +14,7 @@ export default function LoginPage() {
   // 이미 로그인된 경우
   if (profile) {
     const redirect = profile.role === 'system_operator' ? '/operator/dashboard' : '/manager/dashboard'
-    navigate(redirect, { replace: true })
-    return null
+    return <Navigate to={redirect} replace />
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -23,7 +22,7 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error: err } = await signIn(email, password)
+    const { error: err, profile: newProfile } = await signIn(email, password)
     setLoading(false)
 
     if (err) {
@@ -32,7 +31,8 @@ export default function LoginPage() {
     }
 
     const from = (location.state as { from?: { pathname: string } })?.from?.pathname
-    navigate(from || '/operator/dashboard', { replace: true })
+    const defaultRedirect = newProfile?.role === 'system_operator' ? '/operator/dashboard' : '/manager/dashboard'
+    navigate(from || defaultRedirect, { replace: true })
   }
 
   return (

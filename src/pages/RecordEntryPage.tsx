@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -109,6 +109,8 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) 
   )
 }
 
+const LAST_RECORD_KEY = 'last_submitted_record_id'
+
 const schema = z.object({
   vehicle_id: z.string().min(1, '차량을 선택하세요'),
   usage_date: z.string().min(1, '날짜를 선택하세요'),
@@ -144,12 +146,6 @@ export default function RecordEntryPage() {
   })()
   const isEmployeePortal = window.location.pathname === '/employee/record'
 
-  // 세션 없이 /employee/record 접근 시 로그인 페이지로
-  if (isEmployeePortal && !empSession) {
-    navigate('/employee', { replace: true })
-    return null
-  }
-
   function handleLogout() {
     localStorage.removeItem(EMP_SESSION_KEY)
     navigate('/employee', { replace: true })
@@ -159,8 +155,6 @@ export default function RecordEntryPage() {
   const { data: employees } = useEmployees(true)
   const { data: departments } = useDepartments()
   const { data: purposes } = usePurposes()
-
-  const LAST_RECORD_KEY = 'last_submitted_record_id'
 
   const [submitState, setSubmitState] = useState<SubmitState>(() => {
     return sessionStorage.getItem(LAST_RECORD_KEY) ? 'success' : 'idle'
@@ -290,7 +284,12 @@ export default function RecordEntryPage() {
       setDistanceLoading(false)
     }, 600)
     return () => clearTimeout(timeout)
-  }, [selectedVehicleId, cumulativeDistance])
+  }, [selectedVehicleId, cumulativeDistance, usageDate])
+
+  // 세션 없이 /employee/record 접근 시 로그인 페이지로 (모든 hooks 이후)
+  if (isEmployeePortal && !empSession) {
+    return <Navigate to="/employee" replace />
+  }
 
   // 숙박 출장 박수 라벨
   const tripDayDiff = (() => {
