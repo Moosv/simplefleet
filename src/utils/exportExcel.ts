@@ -226,7 +226,7 @@ export async function exportDrivingRecords(
             height: convertMillimetersToTwip(297),
             orientation: PageOrientation.PORTRAIT,
           },
-          margins: {
+          margin: {
             top: convertMillimetersToTwip(15),
             bottom: convertMillimetersToTwip(15),
             left: convertMillimetersToTwip(10),
