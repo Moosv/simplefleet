@@ -1,7 +1,7 @@
 import {
   Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
   WidthType, AlignmentType, VerticalAlign, BorderStyle,
-  ShadingType, VerticalMergeType,
+  ShadingType, VerticalMergeType, TableLayoutType,
 } from 'docx'
 import type { DrivingRecord } from '@/types'
 
@@ -177,6 +177,7 @@ function buildTable(
 
   return new Table({
     width: { size: TABLE_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
     rows: [row1, row2, row3, ...dataRows],
   })
 }
