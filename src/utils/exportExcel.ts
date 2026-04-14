@@ -19,7 +19,7 @@ export const VEHICLE_MANAGER_MAP: Record<string, string> = {
 }
 
 const ORG_NAME = '국립산림과학원 산림생명자원연구부'
-const ROWS_PER_PAGE = 10
+const ROWS_PER_PAGE = 8
 
 // ─── 단위 변환 ────────────────────────────────────────────────────────────
 // 1mm = 56.6929 twips (DXA)
@@ -49,15 +49,16 @@ const FS      = 18   // 9pt (half-points)
 
 // 가로형 기준 행 높이
 // 콘텐츠 높이 = 210 - 15 - 15 = 180mm
-// 헤더 3행: 7 + 6 + 6 = 19mm → 데이터 10행: (180 - 19) / 10 ≒ 16mm
+// 헤더 3행: 7 + 6 + 6 = 19mm → 데이터 8행: (180 - 19) / 8 ≒ 20mm
 const ROW_H_TITLE = MM(7)    // 소속/차량번호 행
 const ROW_H_HEAD  = MM(6)    // 컬럼 헤더 행
-const ROW_H_DATA  = MM(16)   // 데이터 행
+const ROW_H_DATA  = MM(20)   // 데이터 행 (8행 × 20mm = 160mm, 합계 179mm)
 
 function para(text: string, bold = false, size = FS) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 0 },
+    indent: { left: 0, right: 0 },
     children: [new TextRun({ text, bold, size, font: '맑은 고딕' })],
   })
 }
@@ -113,7 +114,8 @@ function buildTable(
   vehiclePlate: string,
   managerName: string,
 ): Table {
-  // 행1: 소속 / 차량번호 / 관리자 (매 페이지 반복)
+  // 행1: 소속 / 차량번호 / 관리자(운행거리 위에 배치) (매 페이지 반복)
+  // col: 0(소속) | 1-3(기관명) | 4(차량번호) | 5-6(차량번호값) | 7(관리자) | 8-10(관리자명)
   const row1 = new TableRow({
     height: { value: ROW_H_TITLE, rule: 'atLeast' },
     tableHeader: true,
@@ -121,9 +123,9 @@ function buildTable(
       makeCell('소속', 0, { gray: true }),
       makeCell(ORG_NAME, 1, { colspan: 3 }),
       makeCell('차량번호', 4, { gray: true }),
-      makeCell(vehiclePlate, 5, { colspan: 4 }),
-      makeCell('관리자', 9, { gray: true }),
-      makeCell(managerName, 10),
+      makeCell(vehiclePlate, 5, { colspan: 2 }),
+      makeCell('관리자', 7, { gray: true }),
+      makeCell(managerName, 8, { colspan: 3 }),
     ],
   })
 
