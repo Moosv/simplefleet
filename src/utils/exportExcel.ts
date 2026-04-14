@@ -19,7 +19,7 @@ export const VEHICLE_MANAGER_MAP: Record<string, string> = {
 }
 
 const ORG_NAME = '국립산림과학원 산림생명자원연구부'
-const ROWS_PER_PAGE = 9
+const ROWS_PER_PAGE = 8
 
 // ─── 단위 변환 ────────────────────────────────────────────────────────────
 const MM = (v: number) => Math.round(v * 56.6929)
@@ -47,10 +47,10 @@ const BORDERS = { top: THIN, bottom: THIN, left: THIN, right: THIN }
 const GRAY    = ShadingType.CLEAR
 const FS      = 18  // 9pt (half-points)
 
-// 행 높이: 헤더 3행(7+6+6=19mm) + 데이터 9행(×17mm=153mm) = 172mm ≤ 180mm
+// 행 높이: 헤더 3행(7+6+6=19mm) + 데이터 8행(×20mm=160mm) = 179mm ≤ 180mm
 const ROW_H_TITLE = MM(7)
 const ROW_H_HEAD  = MM(6)
-const ROW_H_DATA  = MM(17)
+const ROW_H_DATA  = MM(20)
 
 // ─── 단락 (항상 가운데 정렬) ─────────────────────────────────────────────
 function para(text: string, bold = false, size = FS) {
@@ -89,7 +89,7 @@ function makeCell(
     margins:  { top: 30, bottom: 30, left: 50, right: 50 },
     children: [
       opts.rowspan === 'continue'
-        ? new Paragraph({ alignment: AlignmentType.CENTER, children: [] })
+        ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [] })
         : para(text, opts.bold ?? opts.gray),
     ],
   })
