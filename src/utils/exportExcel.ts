@@ -52,12 +52,11 @@ const ROW_H_TITLE = MM(7)
 const ROW_H_HEAD  = MM(6)
 const ROW_H_DATA  = MM(20)
 
-// ─── 단락 (항상 가운데 정렬) ─────────────────────────────────────────────
+// ─── 단락 (가운데 정렬, indent 제거) ────────────────────────────────────
 function para(text: string, bold = false, size = FS) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing:   { before: 0, after: 0 },
-    indent:    { left: 0, right: 0 },
     children:  [new TextRun({ text, bold, size, font: '맑은 고딕' })],
   })
 }
@@ -86,10 +85,14 @@ function makeCell(
     verticalAlign: VerticalAlign.CENTER,
     shading:  opts.gray ? { type: GRAY, color: 'auto', fill: 'D4D4D4' } : undefined,
     borders:  BORDERS,
-    margins:  { top: 30, bottom: 30, left: 50, right: 50 },
+    margins:  { top: 0, bottom: 0, left: 60, right: 60 },
     children: [
       opts.rowspan === 'continue'
-        ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [] })
+        ? new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing:   { before: 0, after: 0 },
+            children:  [],
+          })
         : para(text, opts.bold ?? opts.gray),
     ],
   })
