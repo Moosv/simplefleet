@@ -223,11 +223,12 @@ export async function exportDrivingRecords(
   const children: (Table | Paragraph)[] = []
   pages.forEach((pageRecords, i) => {
     if (i > 0) {
-      // 다음 테이블 앞에 페이지 브레이크 단락
+      // 페이지 브레이크 단락: line=20(1pt=0.35mm)으로 높이 최소화
+      // → 테이블 오버플로 없이 다음 페이지 상단에 헤더가 바로 나옴
       children.push(new Paragraph({
         children: [],
         pageBreakBefore: true,
-        spacing: { before: 0, after: 0 },
+        spacing: { before: 0, after: 0, line: 20, lineRule: 'exact' },
       }))
     }
     children.push(buildTable(pageRecords, vehiclePlate, managerName))
