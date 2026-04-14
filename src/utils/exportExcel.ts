@@ -25,10 +25,11 @@ const ROWS_PER_PAGE = 10
 // 1mm = 56.6929 twips (DXA)
 const MM = (v: number) => Math.round(v * 56.6929)
 
-// A4 가로 (297mm × 210mm), 좌우 여백 12mm, 상하 여백 15mm
+// A4 가로 출력: 라이브러리가 LANDSCAPE 시 width↔height 스왑하므로
+// 세로 기준 치수(210×297)를 넘기면 실제 XML은 가로(297×210)로 생성됨
 // 가용 폭: 297 - 12 - 12 = 273mm
-const PAGE_W    = MM(297)
-const PAGE_H    = MM(210)
+const PAGE_W    = MM(210)   // 라이브러리 내부에서 height로 사용됨 → 실제 가로 297mm
+const PAGE_H    = MM(297)   // 라이브러리 내부에서 width로 사용됨  → 실제 세로 210mm
 const MARGIN_LR = MM(12)
 const MARGIN_TB = MM(15)
 
