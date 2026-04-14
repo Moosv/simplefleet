@@ -1,7 +1,7 @@
 import {
   Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
   WidthType, AlignmentType, VerticalAlign, BorderStyle,
-  ShadingType, VerticalMergeType, TableLayoutType,
+  ShadingType, VerticalMergeType, TableLayoutType, PageOrientation,
 } from 'docx'
 import type { DrivingRecord } from '@/types'
 
@@ -22,31 +22,36 @@ const ORG_NAME = '국립산림과학원 산림생명자원연구부'
 const ROWS_PER_PAGE = 10
 
 // ─── 단위 변환 ────────────────────────────────────────────────────────────
-// 1mm = 56.6929 twips (DXA), 1pt = 20 twips
+// 1mm = 56.6929 twips (DXA)
 const MM = (v: number) => Math.round(v * 56.6929)
 
-// A4 세로 (210mm × 297mm), 좌우 여백 12mm, 상하 여백 15mm
-// 가용 폭: 210 - 12 - 12 = 186mm = 10545 twips
-const PAGE_W    = MM(210)
-const PAGE_H    = MM(297)
+// A4 가로 (297mm × 210mm), 좌우 여백 12mm, 상하 여백 15mm
+// 가용 폭: 297 - 12 - 12 = 273mm
+const PAGE_W    = MM(297)
+const PAGE_H    = MM(210)
 const MARGIN_LR = MM(12)
 const MARGIN_TB = MM(15)
 
-// ─── 열 너비 (mm, 합계 = 186mm) ──────────────────────────────────────────
+// ─── 열 너비 (mm, 합계 = 273mm) ──────────────────────────────────────────
 // A:일자  B:소속  C:운전자  D:용무  E:경유지  F:목적지
 // G:운행기간  H:운행거리  I:누계거리  J:유류수령  K:확인
-const COL_MM = [17, 27, 14, 27, 14, 14, 22, 14, 17, 12, 8]
-// 합계: 17+27+14+27+14+14+22+14+17+12+8 = 186 ✓
+const COL_MM = [25, 40, 21, 40, 21, 21, 32, 21, 25, 18, 9]
+// 합계: 25+40+21+40+21+21+32+21+25+18+9 = 273 ✓
 const COL_W = COL_MM.map(MM)
 const TABLE_W = COL_W.reduce((a, b) => a + b, 0)
 
 // ─── 스타일 ───────────────────────────────────────────────────────────────
-const THIN = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
+const THIN    = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
 const BORDERS = { top: THIN, bottom: THIN, left: THIN, right: THIN }
-const GRAY = ShadingType.CLEAR
-const FS = 18  // 9pt (half-points)
-const ROW_H_DATA = MM(8.5)  // 데이터 행 높이
-const ROW_H_HEAD = MM(6.5)  // 헤더 행 높이
+const GRAY    = ShadingType.CLEAR
+const FS      = 18   // 9pt (half-points)
+
+// 가로형 기준 행 높이
+// 콘텐츠 높이 = 210 - 15 - 15 = 180mm
+// 헤더 3행: 7 + 6 + 6 = 19mm → 데이터 10행: (180 - 19) / 10 ≒ 16mm
+const ROW_H_TITLE = MM(7)    // 소속/차량번호 행
+const ROW_H_HEAD  = MM(6)    // 컬럼 헤더 행
+const ROW_H_DATA  = MM(16)   // 데이터 행
 
 function para(text: string, bold = false, size = FS) {
   return new Paragraph({
@@ -66,14 +71,14 @@ function makeCell(
     bold?: boolean
   } = {}
 ): TableCell {
-  const span = opts.colspan ?? 1
+  const span  = opts.colspan ?? 1
   const width = COL_W.slice(colStart, colStart + span).reduce((a, b) => a + b, 0)
 
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
     columnSpan: span,
     verticalMerge:
-      opts.rowspan === 'start' ? VerticalMergeType.RESTART :
+      opts.rowspan === 'start'    ? VerticalMergeType.RESTART :
       opts.rowspan === 'continue' ? VerticalMergeType.CONTINUE :
       undefined,
     verticalAlign: VerticalAlign.CENTER,
@@ -107,9 +112,10 @@ function buildTable(
   vehiclePlate: string,
   managerName: string,
 ): Table {
-  // 행1: 소속 / 차량번호 / 관리자
+  // 행1: 소속 / 차량번호 / 관리자 (매 페이지 반복)
   const row1 = new TableRow({
-    height: { value: ROW_H_HEAD, rule: 'atLeast' },
+    height: { value: ROW_H_TITLE, rule: 'atLeast' },
+    tableHeader: true,
     children: [
       makeCell('소속', 0, { gray: true }),
       makeCell(ORG_NAME, 1, { colspan: 3 }),
@@ -120,30 +126,32 @@ function buildTable(
     ],
   })
 
-  // 행2: 컬럼 헤더 (일자·용무 등 행2-3 병합)
+  // 행2: 컬럼 헤더 (매 페이지 반복)
   const row2 = new TableRow({
     height: { value: ROW_H_HEAD, rule: 'atLeast' },
+    tableHeader: true,
     children: [
-      makeCell('일자',          0, { rowspan: 'start', gray: true }),
-      makeCell('사용자',        1, { colspan: 2,       gray: true }),
-      makeCell('용무',          3, { rowspan: 'start', gray: true }),
-      makeCell('경유지',        4, { rowspan: 'start', gray: true }),
-      makeCell('목적지',        5, { rowspan: 'start', gray: true }),
-      makeCell('운행기간',      6, { rowspan: 'start', gray: true }),
-      makeCell('운행거리(km)',  7, { rowspan: 'start', gray: true }),
-      makeCell('운행거리누계(km)', 8, { rowspan: 'start', gray: true }),
-      makeCell('유류수령(L)',   9, { rowspan: 'start', gray: true }),
-      makeCell('확인',         10, { rowspan: 'start', gray: true }),
+      makeCell('일자',                 0, { rowspan: 'start', gray: true }),
+      makeCell('사용자',               1, { colspan: 2,       gray: true }),
+      makeCell('용무',                 3, { rowspan: 'start', gray: true }),
+      makeCell('경유지',               4, { rowspan: 'start', gray: true }),
+      makeCell('목적지',               5, { rowspan: 'start', gray: true }),
+      makeCell('운행기간',             6, { rowspan: 'start', gray: true }),
+      makeCell('운행거리(km)',         7, { rowspan: 'start', gray: true }),
+      makeCell('운행거리누계(km)',     8, { rowspan: 'start', gray: true }),
+      makeCell('유류수령(L)',          9, { rowspan: 'start', gray: true }),
+      makeCell('확인',                10, { rowspan: 'start', gray: true }),
     ],
   })
 
-  // 행3: 소속 / 운전자 서브헤더
+  // 행3: 소속 / 운전자 서브헤더 (매 페이지 반복)
   const row3 = new TableRow({
     height: { value: ROW_H_HEAD, rule: 'atLeast' },
+    tableHeader: true,
     children: [
       makeCell('', 0, { rowspan: 'continue' }),
-      makeCell('소속',    1, { gray: true }),
-      makeCell('운전자',  2, { gray: true }),
+      makeCell('소속',   1, { gray: true }),
+      makeCell('운전자', 2, { gray: true }),
       makeCell('', 3, { rowspan: 'continue' }),
       makeCell('', 4, { rowspan: 'continue' }),
       makeCell('', 5, { rowspan: 'continue' }),
@@ -196,7 +204,8 @@ export async function exportDrivingRecords(
   const vehiclePlate = opts.vehiclePlate ?? ''
   const managerName  = opts.managerName  ?? ''
 
-  const sorted = [...records].sort((a, b) => a.usage_date.localeCompare(b.usage_date))
+  // 날짜 내림차순 (최근 데이터가 위)
+  const sorted = [...records].sort((a, b) => b.usage_date.localeCompare(a.usage_date))
 
   const pages: (RecordWithJoins | undefined)[][] = []
   if (sorted.length === 0) {
@@ -225,7 +234,11 @@ export async function exportDrivingRecords(
     sections: [{
       properties: {
         page: {
-          size:   { width: PAGE_W, height: PAGE_H },
+          size: {
+            width:       PAGE_W,
+            height:      PAGE_H,
+            orientation: PageOrientation.LANDSCAPE,
+          },
           margin: {
             top:    MARGIN_TB,
             bottom: MARGIN_TB,
