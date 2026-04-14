@@ -178,6 +178,7 @@ function buildTable(
   return new Table({
     width: { size: TABLE_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
+    columnWidths: COL_W,
     rows: [row1, row2, row3, ...dataRows],
   })
 }
