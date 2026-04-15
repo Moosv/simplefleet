@@ -207,8 +207,8 @@ export async function exportDrivingRecords(
   const vehiclePlate = opts.vehiclePlate ?? ''
   const managerName  = opts.managerName  ?? ''
 
-  // 날짜 내림차순 (최근 데이터가 위)
-  const sorted = [...records].sort((a, b) => b.usage_date.localeCompare(a.usage_date))
+  // 날짜 오름차순 (과거 데이터가 위, 아래로 축적)
+  const sorted = [...records].sort((a, b) => a.usage_date.localeCompare(b.usage_date))
 
   // 9행씩 페이지 분할
   const pages: (RecordWithJoins | undefined)[][] = []
