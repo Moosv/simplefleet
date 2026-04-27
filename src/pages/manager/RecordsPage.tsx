@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { calcDistanceTraveled, toDateString } from '@/utils/distanceCalc'
 import { exportDrivingRecords, VEHICLE_MANAGER_MAP } from '@/utils/exportExcel'
+import { exportBaechaForms } from '@/utils/exportBaecha'
 import type { DrivingRecord } from '@/types'
 
 type RecordWithJoins = DrivingRecord & {
@@ -561,6 +562,15 @@ export default function ManagerRecordsPage() {
     setDeletingId(null)
   }
 
+  function exportBaecha() {
+    if (!records) return
+    const selectedVehicle = vehicles?.find(v => v.id === vehicleId)
+    const dateTag = (startDate && endDate) ? `${startDate}~${endDate}` : new Date().toISOString().split('T')[0]
+    exportBaechaForms(records as unknown as Parameters<typeof exportBaechaForms>[0], {
+      filename: `배차신청서_${selectedVehicle?.license_plate || '전체'}_${dateTag}`,
+    })
+  }
+
   function exportToExcel() {
     if (!records) return
     const selectedVehicle = vehicles?.find(v => v.id === vehicleId)
@@ -610,6 +620,14 @@ export default function ManagerRecordsPage() {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             차량운행일지 출력
+          </button>
+          <button onClick={exportBaecha}
+            className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            배차신청서 출력
           </button>
         </div>
       </div>
