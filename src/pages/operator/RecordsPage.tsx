@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { exportDrivingRecords, VEHICLE_MANAGER_MAP } from '@/utils/exportExcel'
+import { exportBaechaForms } from '@/utils/exportBaecha'
 import { useRecords } from '@/hooks/useRecords'
 import { useDepartments, useEmployees, useVehicles, usePurposes } from '@/hooks/useEmployees'
 import { supabase } from '@/lib/supabase'
@@ -15,7 +16,7 @@ type RecordWithJoins = DrivingRecord & {
 // 사용일자 표시
 function formatDateRange(r: RecordWithJoins) {
   if (r.end_date && r.end_date !== r.usage_date) {
-    return `${r.usage_date} ~ ${r.end_date}`
+    return <>{r.usage_date}<br />{r.end_date}</>
   }
   return r.usage_date
 }
@@ -532,6 +533,15 @@ export default function RecordsPage() {
     setAddingRecord(false)
   }
 
+  function exportBaecha() {
+    if (!records) return
+    const selectedVehicle = vehicles?.find(v => v.id === vehicleId)
+    const dateTag = (startDate && endDate) ? `${startDate}~${endDate}` : new Date().toISOString().split('T')[0]
+    exportBaechaForms(records as unknown as Parameters<typeof exportBaechaForms>[0], {
+      filename: `배차신청서_${selectedVehicle?.license_plate || '전체'}_${dateTag}`,
+    })
+  }
+
   function exportToExcel() {
     if (!records) return
     const selectedVehicle = vehicles?.find(v => v.id === vehicleId)
@@ -584,6 +594,16 @@ export default function RecordsPage() {
             </svg>
             차량운행일지 출력
           </button>
+          <button
+            onClick={exportBaecha}
+            className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            배차신청서 출력
+          </button>
         </div>
       </div>
 
@@ -633,17 +653,17 @@ export default function RecordsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['사용일자', '출발/도착', '소속', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', '차량', ''].map(h => (
+                {['사용일자', '출발/도착', '소속', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', '차량', '전체 내용', '배차신청서'].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {isLoading && (
-                <tr><td colSpan={13} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
+                <tr><td colSpan={14} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
               )}
               {!isLoading && records?.length === 0 && (
-                <tr><td colSpan={13} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
+                <tr><td colSpan={14} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
               )}
               {(records as unknown as RecordWithJoins[] | undefined)?.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50 transition-colors">
@@ -655,9 +675,9 @@ export default function RecordsPage() {
                   </td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{r.departments?.name ?? '-'}</td>
                   <td className="px-3 py-3 font-medium text-gray-900">{r.driver_name}</td>
-                  <td className="px-3 py-3 text-gray-600 text-xs">{r.purpose}</td>
-                  <td className="px-3 py-3 text-gray-500 text-xs max-w-20 truncate">{r.waypoint ?? '-'}</td>
-                  <td className="px-3 py-3 text-gray-600 text-xs max-w-28 truncate">{r.destination}</td>
+                  <td className="px-3 py-3 text-gray-600 text-xs max-w-24 truncate">{r.purpose}</td>
+                  <td className="px-3 py-3 text-gray-500 text-xs max-w-16 truncate">{r.waypoint ?? '-'}</td>
+                  <td className="px-3 py-3 text-gray-600 text-xs max-w-24 truncate">{r.destination}</td>
                   <td className="px-3 py-3 text-xs whitespace-nowrap">
                     {r.end_date && r.end_date !== r.usage_date ? (
                       <span className="text-violet-600 font-medium">{formatTripPeriod(r)}</span>
@@ -671,17 +691,27 @@ export default function RecordsPage() {
                   <td className="px-3 py-3 text-gray-600 text-xs whitespace-nowrap">{r.cumulative_distance.toLocaleString()}km</td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{r.fuel_amount != null ? `${r.fuel_amount}L` : '-'}</td>
                   <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">{r.vehicles?.license_plate ?? '-'}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2 whitespace-nowrap">
+                  <td className="px-2 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-0.5">
                       <button onClick={() => setEditingRecord(r)}
-                        className="text-xs text-blue-500 hover:text-blue-700 transition-colors">
+                        className="text-xs px-1.5 py-0.5 rounded text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                         수정
                       </button>
                       <button onClick={() => handleDelete(r.id)}
-                        className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                        className="text-xs px-1.5 py-0.5 rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors">
                         삭제
                       </button>
                     </div>
+                  </td>
+                  <td className="px-2 py-3 whitespace-nowrap">
+                    <button
+                      onClick={() => exportBaechaForms([r] as unknown as Parameters<typeof exportBaechaForms>[0], {
+                        filename: `배차신청서_${r.driver_name}_${r.usage_date}`,
+                      })}
+                      className="text-xs px-1.5 py-0.5 rounded text-violet-600 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                    >
+                      출력
+                    </button>
                   </td>
                 </tr>
               ))}
