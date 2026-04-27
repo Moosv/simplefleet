@@ -91,7 +91,7 @@ export default function AdminLayout({ children, navItems, title }: Props) {
           로그아웃
         </button>
         <div className="text-center mt-2 space-y-1">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">v1.2.8</span>
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-500 border border-blue-100">v1.3.0</span>
           <p className="text-xs text-gray-400">© 2026 MSKIM</p>
         </div>
       </div>
