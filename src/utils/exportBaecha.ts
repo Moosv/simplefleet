@@ -13,219 +13,218 @@ type RecordWithJoins = DrivingRecord & {
 
 const MM = (v: number) => Math.round(v * 56.6929)
 
-// A4 portrait: margins 15mm LR, 20mm TB → usable 180mm × 257mm
+// A4 portrait, margins 15mm LR / 20mm TB → usable 180 × 257mm
 const PAGE_W    = MM(210)
 const PAGE_H    = MM(297)
 const MARGIN_LR = MM(15)
 const MARGIN_TB = MM(20)
 
-// Layout: [형식 87mm] [gap 6mm] [승인서 87mm] = 180mm
-const FORM_W = MM(87)
-const GAP_W  = MM(6)
+// 두 양식 레이아웃: [88mm] [4mm gap] [88mm] = 180mm
+const FORM_W = MM(88)
+const GAP_W  = MM(4)
 
-// Inner form columns [22, 29, 18, 18] = 87mm
-const C = [MM(22), MM(29), MM(18), MM(18)] as const
+// 내부 테이블 컬럼 [22, 34, 18, 14] = 88mm
+const C = [MM(22), MM(34), MM(18), MM(14)] as const
 
 const FS    = 18  // 9pt
 const FS_SM = 16  // 8pt
-const FS_LG = 22  // 11pt
+const FS_TL = 24  // 12pt (form title)
 
 const THIN   = { style: BorderStyle.SINGLE, size: 4,  color: '000000' }
 const NONE_B = { style: BorderStyle.NONE,   size: 0,  color: 'FFFFFF' }
-const DASH_B = { style: BorderStyle.DASHED, size: 6,  color: '888888' }
+const DASH_B = { style: BorderStyle.DASHED, size: 8,  color: '666666' }
 
 const BORDERS_ALL  = { top: THIN, bottom: THIN, left: THIN, right: THIN }
 const BORDERS_NONE = { top: NONE_B, bottom: NONE_B, left: NONE_B, right: NONE_B }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── 단락 헬퍼 ────────────────────────────────────────────────────────────
 
-function korPara(text: string, opts: {
-  bold?: boolean; size?: number; align?: typeof AlignmentType[keyof typeof AlignmentType]
-  spaceBefore?: number; spaceAfter?: number
-} = {}): Paragraph {
+function p(
+  text: string,
+  align: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.CENTER,
+  size = FS,
+  bold = false,
+  spaceBefore = 0,
+  spaceAfter = 0,
+): Paragraph {
   return new Paragraph({
-    alignment: opts.align ?? AlignmentType.CENTER,
-    spacing: { before: opts.spaceBefore ?? 60, after: opts.spaceAfter ?? 60 },
-    children: [new TextRun({ text, bold: opts.bold ?? false, size: opts.size ?? FS, font: '맑은 고딕' })],
+    alignment: align,
+    spacing: { before: spaceBefore, after: spaceAfter },
+    children: [new TextRun({ text, bold, size, font: '맑은 고딕' })],
   })
 }
 
-function emptyP(space = 80): Paragraph {
-  return new Paragraph({ spacing: { before: space, after: space }, children: [] })
+function gap(twips: number): Paragraph {
+  return new Paragraph({ spacing: { before: twips, after: 0 }, children: [] })
 }
 
-function titlePara(text: string): Paragraph {
+// 양식 제목 (하단 테두리로 밑줄 효과)
+function formTitle(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 100, after: 100 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-    children: [new TextRun({ text, bold: true, size: FS_LG, font: '맑은 고딕' })],
+    spacing: { before: 0, after: MM(4) },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
+    children: [new TextRun({ text, bold: true, size: FS_TL, font: '맑은 고딕' })],
   })
 }
 
-function fmtDT(date: string, time: string | null, suffix: string): string {
+// ── 날짜/시간 포맷 ───────────────────────────────────────────────────────
+
+function fmtDT(date: string, time: string | null, suffix: '부터' | '까지'): string {
   const [y, m, d] = date.split('-')
-  if (!time) return `${y}년  ${m}월  ${d}일       시       분 ${suffix}`
+  if (!time) {
+    return `${y}년   월   일   시   분 ${suffix}`
+  }
   const [h, mi] = time.split(':')
   return `${y}년  ${m}월  ${d}일  ${h}시  ${mi}분 ${suffix}`
 }
 
 function fmtDate(date: string): string {
   const [y, m, d] = date.split('-')
-  return `${y}년     ${m}월     ${d}일`
+  return `${y}년       ${m}월       ${d}일`
 }
+
+// ── 셀 헬퍼 ─────────────────────────────────────────────────────────────
 
 function spanW(start: number, count: number): number {
   return (C.slice(start, start + count) as number[]).reduce((a, b) => a + b, 0)
 }
 
-// Table cell factory
-function fc(
+function cell(
   text: string,
   width: number,
   opts: {
     colspan?: number
     rowspan?: 'start' | 'continue'
     bold?: boolean
-    align?: typeof AlignmentType[keyof typeof AlignmentType]
-    borders?: object
-  } = {}
+    align?: (typeof AlignmentType)[keyof typeof AlignmentType]
+    size?: number
+  } = {},
 ): TableCell {
   return new TableCell({
-    width: { size: width, type: WidthType.DXA },
-    columnSpan: opts.colspan ?? 1,
+    width:         { size: width, type: WidthType.DXA },
+    columnSpan:    opts.colspan ?? 1,
     verticalMerge:
-      opts.rowspan === 'start'    ? VerticalMergeType.RESTART :
+      opts.rowspan === 'start'    ? VerticalMergeType.RESTART  :
       opts.rowspan === 'continue' ? VerticalMergeType.CONTINUE :
       undefined,
     verticalAlign: VerticalAlign.CENTER,
-    borders: (opts.borders ?? BORDERS_ALL) as typeof BORDERS_ALL,
-    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+    borders:       BORDERS_ALL,
+    margins:       { top: 40, bottom: 40, left: 80, right: 80 },
     children: [
       opts.rowspan === 'continue'
         ? new Paragraph({ children: [] })
         : new Paragraph({
             alignment: opts.align ?? AlignmentType.CENTER,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text, bold: opts.bold ?? false, size: FS, font: '맑은 고딕' })],
+            spacing:   { before: 0, after: 0 },
+            children:  [new TextRun({
+              text,
+              bold:  opts.bold ?? false,
+              size:  opts.size ?? FS,
+              font:  '맑은 고딕',
+            })],
           }),
     ],
   })
 }
 
-// ── 배차신청서 내부 테이블 ─────────────────────────────────────────────────
+const ROW_H = { value: MM(10), rule: 'exact' as const }
 
-function buildRequestTable(r: RecordWithJoins): Table {
-  const dept = r.departments?.name ?? '산림특용자원연구과'
-  const endDate = r.end_date && r.end_date !== r.usage_date ? r.end_date : r.usage_date
+// ── 배차신청서 테이블 ─────────────────────────────────────────────────────
+
+function requestTable(r: RecordWithJoins): Table {
+  const dept    = r.departments?.name ?? '산림특용자원연구과'
+  const endDate = (r.end_date && r.end_date !== r.usage_date) ? r.end_date : r.usage_date
 
   return new Table({
-    width: { size: FORM_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
+    width:        { size: FORM_W, type: WidthType.DXA },
+    layout:       TableLayoutType.FIXED,
     columnWidths: [...C],
     rows: [
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('사 용 일 자', C[0], { rowspan: 'start', bold: true }),
-          fc(fmtDT(r.usage_date, r.departure_time, '부터'), spanW(1, 3), { colspan: 3, align: AlignmentType.LEFT }),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('', C[0], { rowspan: 'continue' }),
-          fc(fmtDT(endDate, r.arrival_time, '까지'), spanW(1, 3), { colspan: 3, align: AlignmentType.LEFT }),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('행  선  지', C[0], { bold: true }),
-          fc(r.destination, C[1]),
-          fc('경  유  지', C[2], { bold: true }),
-          fc(r.waypoint ?? '', C[3]),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('용     무', C[0], { bold: true }),
-          fc(r.purpose, spanW(1, 3), { colspan: 3 }),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('사  용  자', C[0], { bold: true }),
-          fc(dept, spanW(1, 3), { colspan: 3 }),
-        ],
-      }),
+      // 사용일자 (rowspan 2) | 부터
+      new TableRow({ height: ROW_H, children: [
+        cell('사 용 일 자', C[0], { rowspan: 'start', bold: true }),
+        cell(fmtDT(r.usage_date, r.departure_time, '부터'), spanW(1, 3),
+          { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
+      // continue | 까지
+      new TableRow({ height: ROW_H, children: [
+        cell('', C[0], { rowspan: 'continue' }),
+        cell(fmtDT(endDate, r.arrival_time, '까지'), spanW(1, 3),
+          { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
+      // 행선지 | dest | 경유지 | waypoint
+      new TableRow({ height: ROW_H, children: [
+        cell('행  선  지', C[0], { bold: true }),
+        cell(r.destination, C[1], { align: AlignmentType.CENTER }),
+        cell('경  유  지', C[2], { bold: true }),
+        cell(r.waypoint ?? '', C[3], { align: AlignmentType.CENTER }),
+      ]}),
+      // 용무 | colspan 3
+      new TableRow({ height: ROW_H, children: [
+        cell('용     무', C[0], { bold: true }),
+        cell(r.purpose, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
+      // 사용자 | colspan 3
+      new TableRow({ height: ROW_H, children: [
+        cell('사  용  자', C[0], { bold: true }),
+        cell(dept, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
     ],
   })
 }
 
-// ── 배차승인서 내부 테이블 ─────────────────────────────────────────────────
+// ── 배차승인서 테이블 ─────────────────────────────────────────────────────
 
-function buildApprovalTable(r: RecordWithJoins): Table {
-  const dept = r.departments?.name ?? '산림특용자원연구과'
-  const plate = r.vehicles?.license_plate ?? r.vehicles?.name ?? ''
-  const endDate = r.end_date && r.end_date !== r.usage_date ? r.end_date : r.usage_date
+function approvalTable(r: RecordWithJoins): Table {
+  const dept     = r.departments?.name ?? '산림특용자원연구과'
+  const plate    = r.vehicles?.license_plate ?? r.vehicles?.name ?? ''
+  const endDate  = (r.end_date && r.end_date !== r.usage_date) ? r.end_date : r.usage_date
   const distance = r.distance_traveled != null ? `${r.distance_traveled}km` : ''
 
   return new Table({
-    width: { size: FORM_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
+    width:        { size: FORM_W, type: WidthType.DXA },
+    layout:       TableLayoutType.FIXED,
     columnWidths: [...C],
     rows: [
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('차  량  번  호', C[0], { bold: true }),
-          fc(plate, C[1]),
-          fc('운  전  원', C[2], { bold: true }),
-          fc(r.driver_name, C[3]),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('배  차  일  시', C[0], { rowspan: 'start', bold: true }),
-          fc(fmtDT(r.usage_date, r.departure_time, '부터'), spanW(1, 3), { colspan: 3, align: AlignmentType.LEFT }),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('', C[0], { rowspan: 'continue' }),
-          fc(fmtDT(endDate, r.arrival_time, '까지'), spanW(1, 3), { colspan: 3, align: AlignmentType.LEFT }),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('행  선  지', C[0], { bold: true }),
-          fc(r.destination, C[1]),
-          fc('경  유  지', C[2], { bold: true }),
-          fc(r.waypoint ?? '', C[3]),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('용     무', C[0], { bold: true }),
-          fc(r.purpose, C[1]),
-          fc('운 행 거 리', C[2], { bold: true }),
-          fc(distance, C[3]),
-        ],
-      }),
-      new TableRow({
-        height: { value: MM(9), rule: 'exact' },
-        children: [
-          fc('사  용  자', C[0], { bold: true }),
-          fc(dept, spanW(1, 3), { colspan: 3 }),
-        ],
-      }),
+      // 차량번호 | plate | 운전원 | driver
+      new TableRow({ height: ROW_H, children: [
+        cell('차  량  번  호', C[0], { bold: true }),
+        cell(plate, C[1], { align: AlignmentType.CENTER }),
+        cell('운  전  원', C[2], { bold: true }),
+        cell(r.driver_name, C[3], { align: AlignmentType.CENTER }),
+      ]}),
+      // 배차일시 (rowspan 2) | 부터
+      new TableRow({ height: ROW_H, children: [
+        cell('배  차  일  시', C[0], { rowspan: 'start', bold: true }),
+        cell(fmtDT(r.usage_date, r.departure_time, '부터'), spanW(1, 3),
+          { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
+      // continue | 까지
+      new TableRow({ height: ROW_H, children: [
+        cell('', C[0], { rowspan: 'continue' }),
+        cell(fmtDT(endDate, r.arrival_time, '까지'), spanW(1, 3),
+          { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
+      // 행선지 | dest | 경유지 | waypoint
+      new TableRow({ height: ROW_H, children: [
+        cell('행  선  지', C[0], { bold: true }),
+        cell(r.destination, C[1], { align: AlignmentType.CENTER }),
+        cell('경  유  지', C[2], { bold: true }),
+        cell(r.waypoint ?? '', C[3], { align: AlignmentType.CENTER }),
+      ]}),
+      // 용무 | purpose | 운행거리 | km
+      new TableRow({ height: ROW_H, children: [
+        cell('용     무', C[0], { bold: true }),
+        cell(r.purpose, C[1], { align: AlignmentType.CENTER }),
+        cell('운 행 거 리', C[2], { bold: true }),
+        cell(distance, C[3], { align: AlignmentType.CENTER }),
+      ]}),
+      // 사용자 | colspan 3
+      new TableRow({ height: ROW_H, children: [
+        cell('사  용  자', C[0], { bold: true }),
+        cell(dept, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
+      ]}),
     ],
   })
 }
@@ -234,19 +233,19 @@ function buildApprovalTable(r: RecordWithJoins): Table {
 
 function noteBox(text: string): Table {
   return new Table({
-    width: { size: FORM_W, type: WidthType.DXA },
+    width:  { size: FORM_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     rows: [
       new TableRow({
         children: [
           new TableCell({
-            width: { size: FORM_W, type: WidthType.DXA },
+            width:   { size: FORM_W, type: WidthType.DXA },
             borders: BORDERS_ALL,
             margins: { top: 60, bottom: 60, left: 100, right: 100 },
             children: [new Paragraph({
               alignment: AlignmentType.LEFT,
-              spacing: { before: 0, after: 0 },
-              children: [new TextRun({ text, size: FS_SM, font: '맑은 고딕' })],
+              spacing:   { before: 0, after: 0 },
+              children:  [new TextRun({ text, size: FS_SM, font: '맑은 고딕' })],
             })],
           }),
         ],
@@ -255,97 +254,91 @@ function noteBox(text: string): Table {
   })
 }
 
-// ── 각 셀 콘텐츠 ──────────────────────────────────────────────────────────
+// ── 각 셀 내부 콘텐츠 ────────────────────────────────────────────────────
 
-function buildRequestContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
+function requestContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
   const dept = r.departments?.name ?? '산림특용자원연구과'
   return [
-    emptyP(60),
-    titlePara('배 차 신 청 서'),
-    emptyP(80),
-    buildRequestTable(r),
-    emptyP(100),
-    korPara('위와 같이 차량의 배차를 요청하오니 승인하여 주시기 바랍니다.'),
-    emptyP(120),
-    korPara(fmtDate(r.usage_date)),
-    emptyP(80),
-    korPara(`${dept}                     (인)`),
-    emptyP(80),
-    korPara(`${dept}   ${managerName}   귀하`),
-    emptyP(80),
+    gap(MM(6)),
+    formTitle('배 차 신 청 서'),
+    gap(MM(5)),
+    requestTable(r),
+    gap(MM(10)),
+    p('위와 같이 차량의 배차를 요청하오니 승인하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
+    gap(MM(12)),
+    p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
+    gap(MM(10)),
+    p(`${dept}                   (인)`, AlignmentType.CENTER, FS),
+    gap(MM(6)),
+    p(`${dept}   ${managerName}   귀하`, AlignmentType.CENTER, FS),
+    gap(MM(10)),
     noteBox('※ 적어도 사용하기 1시간 전까지 배차를 요청하여야 합니다.'),
   ]
 }
 
-function buildApprovalContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
+function approvalContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
   const dept = r.departments?.name ?? '산림특용자원연구과'
   return [
-    emptyP(60),
-    titlePara('배 차 승 인 서'),
-    emptyP(80),
-    buildApprovalTable(r),
-    emptyP(100),
-    korPara('이와 같이 배차하오니 안전운행에 유의하여 주시기 바랍니다.'),
-    emptyP(120),
-    korPara(fmtDate(r.usage_date)),
-    emptyP(80),
-    korPara(`${dept}   ${managerName}   (인)`),
-    emptyP(80),
-    korPara(`${dept}                     귀하`),
-    emptyP(80),
+    gap(MM(6)),
+    formTitle('배 차 승 인 서'),
+    gap(MM(5)),
+    approvalTable(r),
+    gap(MM(10)),
+    p('이와 같이 배차하오니 안전운행에 유의하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
+    gap(MM(12)),
+    p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
+    gap(MM(10)),
+    p(`${dept}   ${managerName}   (인)`, AlignmentType.CENTER, FS),
+    gap(MM(6)),
+    p(`${dept}                   귀하`, AlignmentType.CENTER, FS),
+    gap(MM(10)),
     noteBox('※ 운전원은 운행종료 후 즉시 이 승인서를 반납하여야 합니다.'),
   ]
 }
 
-// ── 페이지(레코드 1건) 빌드 ───────────────────────────────────────────────
+// ── 페이지(레코드 1건) ────────────────────────────────────────────────────
 
-function buildPage(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
-  const formsTable = new Table({
-    width: { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
+function buildPage(r: RecordWithJoins, managerName: string): Table {
+  return new Table({
+    width:        { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
+    layout:       TableLayoutType.FIXED,
     columnWidths: [FORM_W, GAP_W, FORM_W],
     rows: [
       new TableRow({
         children: [
+          // 배차신청서 (우측에 dashed border = 가운데 절취선)
           new TableCell({
-            width: { size: FORM_W, type: WidthType.DXA },
-            borders: { top: NONE_B, bottom: NONE_B, left: NONE_B, right: DASH_B },
-            margins: { top: 0, bottom: 0, left: 0, right: MM(3) },
+            width:         { size: FORM_W, type: WidthType.DXA },
+            borders:       { top: NONE_B, bottom: NONE_B, left: NONE_B, right: DASH_B },
+            margins:       { top: 0, bottom: 0, left: 0, right: MM(4) },
             verticalAlign: VerticalAlign.TOP,
-            children: buildRequestContent(r, managerName),
+            children:      requestContent(r, managerName),
           }),
+          // 가운데 간격
           new TableCell({
-            width: { size: GAP_W, type: WidthType.DXA },
+            width:   { size: GAP_W, type: WidthType.DXA },
             borders: BORDERS_NONE,
-            children: [new Paragraph({ children: [] })],
+            children:[new Paragraph({ children: [] })],
           }),
+          // 배차승인서
           new TableCell({
-            width: { size: FORM_W, type: WidthType.DXA },
-            borders: BORDERS_NONE,
-            margins: { top: 0, bottom: 0, left: MM(3), right: 0 },
+            width:         { size: FORM_W, type: WidthType.DXA },
+            borders:       BORDERS_NONE,
+            margins:       { top: 0, bottom: 0, left: MM(4), right: 0 },
             verticalAlign: VerticalAlign.TOP,
-            children: buildApprovalContent(r, managerName),
+            children:      approvalContent(r, managerName),
           }),
         ],
       }),
     ],
   })
-
-  return [
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 160 },
-      children: [new TextRun({ text: '배 차 신 청 서', bold: true, size: 36, font: '맑은 고딕' })],
-    }),
-    formsTable,
-  ]
 }
 
-// ── 공개 API ──────────────────────────────────────────────────────────────
+// ── 공개 API ─────────────────────────────────────────────────────────────
 
 export async function exportBaechaForms(
   records: RecordWithJoins[],
-  opts: { filename?: string } = {}
+  opts: { filename?: string } = {},
 ): Promise<void> {
   if (records.length === 0) return
 
@@ -355,20 +348,20 @@ export async function exportBaechaForms(
   sorted.forEach((r, i) => {
     if (i > 0) {
       children.push(new Paragraph({
-        children: [],
+        children:        [],
         pageBreakBefore: true,
-        spacing: { before: 0, after: 0, line: 20, lineRule: 'exact' },
+        spacing:         { before: 0, after: 0, line: 20, lineRule: 'exact' },
       }))
     }
     const managerName = r.vehicles ? (VEHICLE_MANAGER_MAP[r.vehicles.name] ?? '') : ''
-    children.push(...buildPage(r, managerName))
+    children.push(buildPage(r, managerName))
   })
 
   const doc = new Document({
     sections: [{
       properties: {
         page: {
-          size: { width: PAGE_W, height: PAGE_H },
+          size:   { width: PAGE_W, height: PAGE_H },
           margin: { top: MARGIN_TB, bottom: MARGIN_TB, left: MARGIN_LR, right: MARGIN_LR },
         },
       },
@@ -377,9 +370,9 @@ export async function exportBaechaForms(
   })
 
   const blob = await Packer.toBlob(doc)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
   a.download = `${opts.filename ?? `배차신청서_${new Date().toISOString().split('T')[0]}`}.docx`
   document.body.appendChild(a)
   a.click()
