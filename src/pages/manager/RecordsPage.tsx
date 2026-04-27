@@ -677,17 +677,17 @@ export default function ManagerRecordsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['사용일자', '출발/도착', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', ''].map(h => (
+                {['사용일자', '출발/도착', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', '전체 내용', '배차신청서'].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {isLoading && (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
+                <tr><td colSpan={12} className="px-4 py-8 text-center text-sm text-gray-400">불러오는 중...</td></tr>
               )}
               {!isLoading && records?.length === 0 && (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
+                <tr><td colSpan={12} className="px-4 py-8 text-center text-sm text-gray-400">기록이 없습니다</td></tr>
               )}
               {(records as unknown as RecordWithJoins[] | undefined)?.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
@@ -713,28 +713,30 @@ export default function ManagerRecordsPage() {
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-xs whitespace-nowrap">{r.cumulative_distance.toLocaleString()}km</td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{r.fuel_amount != null ? `${r.fuel_amount}L` : '-'}</td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-1 flex-nowrap">
+                  <td className="px-2 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-0.5">
                       <button onClick={() => setEditingRecord(r)}
-                        className="text-xs px-2 py-0.5 rounded text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                        className="text-xs px-1.5 py-0.5 rounded text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                         수정
                       </button>
                       <button
                         onClick={() => handleDelete(r.id, r.driver_name)}
                         disabled={deletingId === r.id}
-                        className="text-xs px-2 py-0.5 rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
+                        className="text-xs px-1.5 py-0.5 rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
                       >
                         삭제
                       </button>
-                      <button
-                        onClick={() => exportBaechaForms([r] as unknown as Parameters<typeof exportBaechaForms>[0], {
-                          filename: `배차신청서_${r.driver_name}_${r.usage_date}`,
-                        })}
-                        className="text-xs px-2 py-0.5 rounded text-violet-600 hover:bg-violet-50 hover:text-violet-700 transition-colors"
-                      >
-                        출력
-                      </button>
                     </div>
+                  </td>
+                  <td className="px-2 py-3 whitespace-nowrap">
+                    <button
+                      onClick={() => exportBaechaForms([r] as unknown as Parameters<typeof exportBaechaForms>[0], {
+                        filename: `배차신청서_${r.driver_name}_${r.usage_date}`,
+                      })}
+                      className="text-xs px-1.5 py-0.5 rounded text-violet-600 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                    >
+                      출력
+                    </button>
                   </td>
                 </tr>
               ))}
