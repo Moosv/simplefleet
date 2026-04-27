@@ -299,8 +299,8 @@ function buildApprovalContent(r: RecordWithJoins, managerName: string): (Paragra
 
 // ── 페이지(레코드 1건) 빌드 ───────────────────────────────────────────────
 
-function buildPage(r: RecordWithJoins, managerName: string): Table {
-  return new Table({
+function buildPage(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
+  const formsTable = new Table({
     width: { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [FORM_W, GAP_W, FORM_W],
@@ -330,6 +330,15 @@ function buildPage(r: RecordWithJoins, managerName: string): Table {
       }),
     ],
   })
+
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 160 },
+      children: [new TextRun({ text: '배 차 신 청 서', bold: true, size: 36, font: '맑은 고딕' })],
+    }),
+    formsTable,
+  ]
 }
 
 // ── 공개 API ──────────────────────────────────────────────────────────────
@@ -352,7 +361,7 @@ export async function exportBaechaForms(
       }))
     }
     const managerName = r.vehicles ? (VEHICLE_MANAGER_MAP[r.vehicles.name] ?? '') : ''
-    children.push(buildPage(r, managerName))
+    children.push(...buildPage(r, managerName))
   })
 
   const doc = new Document({
