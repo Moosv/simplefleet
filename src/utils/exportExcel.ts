@@ -99,14 +99,26 @@ function makeCell(
 }
 
 // ─── 데이터 포맷 ──────────────────────────────────────────────────────────
+function toMD(dateStr: string) {
+  return dateStr.slice(5).replace('-', '/')
+}
+
 function formatDate(r: RecordWithJoins): string {
   if (r.end_date && r.end_date !== r.usage_date)
-    return `${r.usage_date}~${r.end_date}`
-  return r.usage_date.slice(5).replace('-', '/')
+    return `${toMD(r.usage_date)}~${toMD(r.end_date)}`
+  return toMD(r.usage_date)
 }
 
 function formatPeriod(r: RecordWithJoins): string {
-  if (r.departure_time && r.arrival_time) return `${r.departure_time}~${r.arrival_time}`
+  const isOvernight = r.end_date && r.end_date !== r.usage_date
+  if (r.departure_time && r.arrival_time) {
+    if (isOvernight) {
+      const depDay = r.usage_date.slice(8)
+      const arrDay = r.end_date!.slice(8)
+      return `${depDay}일 ${r.departure_time}~${arrDay}일 ${r.arrival_time}`
+    }
+    return `${r.departure_time}~${r.arrival_time}`
+  }
   if (r.duration_hours != null) return `${r.duration_hours}시간`
   return ''
 }
