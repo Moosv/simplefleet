@@ -15,7 +15,7 @@ type RecordWithJoins = DrivingRecord & {
 
 function formatDateRange(r: RecordWithJoins) {
   if (r.end_date && r.end_date !== r.usage_date) {
-    return `${r.usage_date} ~ ${r.end_date}`
+    return <>{r.usage_date}<br />{r.end_date}</>
   }
   return r.usage_date
 }
@@ -676,9 +676,7 @@ export default function ManagerRecordsPage() {
                   <td className="px-3 py-3 text-gray-700 text-xs whitespace-nowrap">{formatDateRange(r)}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-gray-500 text-xs">
                     {r.departure_time && r.arrival_time
-                      ? r.end_date && r.end_date !== r.usage_date
-                        ? <>{r.usage_date.slice(5).replace('-', '/')} {r.departure_time}<br />{r.end_date.slice(5).replace('-', '/')} {r.arrival_time}</>
-                        : <>{r.departure_time}<br />{r.arrival_time}</>
+                      ? <>{r.departure_time}<br />{r.arrival_time}</>
                       : '-'}
                   </td>
                   <td className="px-3 py-3 font-medium text-gray-900">{r.driver_name}</td>
