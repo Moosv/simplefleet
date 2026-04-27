@@ -726,6 +726,14 @@ export default function ManagerRecordsPage() {
                       >
                         삭제
                       </button>
+                      <button
+                        onClick={() => exportBaechaForms([r] as unknown as Parameters<typeof exportBaechaForms>[0], {
+                          filename: `배차신청서_${r.driver_name}_${r.usage_date}`,
+                        })}
+                        className="text-xs text-violet-500 hover:text-violet-700 transition-colors"
+                      >
+                        출력
+                      </button>
                     </div>
                   </td>
                 </tr>
