@@ -4,7 +4,21 @@ import {
   VerticalMergeType, TableLayoutType,
 } from 'docx'
 import type { DrivingRecord } from '@/types'
-import { VEHICLE_MANAGER_MAP } from './exportExcel'
+
+// 차량별 담당자 우선순위 (높은 순서대로, 운전자와 겹치면 다음 사람으로)
+const VEHICLE_APPROVERS: Record<string, { ownerDept: string; priority: string[] }> = {
+  '숲푸드트럭':   { ownerDept: '산림특용자원연구과', priority: ['권순호', '김철우', '황병현'] },
+  '스마트달구지': { ownerDept: '산림특용자원연구과', priority: ['한진규', '어현지', '김문섭'] },
+  '꿀벌붕붕카':  { ownerDept: '산림특용자원연구과', priority: ['김현준', '나성준'] },
+  '꿀벌 붕붕카': { ownerDept: '산림특용자원연구과', priority: ['김현준', '나성준'] },
+}
+
+function resolveApprover(vehicleName: string | undefined, driverName: string) {
+  const cfg = vehicleName ? VEHICLE_APPROVERS[vehicleName] : undefined
+  const ownerDept = cfg?.ownerDept ?? '산림특용자원연구과'
+  const approver  = cfg?.priority.find(n => n !== driverName) ?? cfg?.priority[0] ?? ''
+  return { ownerDept, approver }
+}
 
 type RecordWithJoins = DrivingRecord & {
   departments?: { name: string } | null
@@ -141,34 +155,29 @@ function requestTable(r: RecordWithJoins): Table {
     layout:       TableLayoutType.FIXED,
     columnWidths: [...C],
     rows: [
-      // 사용일자 (rowspan 2) | 부터
       new TableRow({ height: ROW_H, children: [
         cell('사 용 일 자', C[0], { rowspan: 'start', bold: true }),
         cell(fmtDT(r.usage_date, r.departure_time, '부터'), spanW(1, 3),
           { colspan: 3, align: AlignmentType.CENTER }),
       ]}),
-      // continue | 까지
       new TableRow({ height: ROW_H, children: [
         cell('', C[0], { rowspan: 'continue' }),
         cell(fmtDT(endDate, r.arrival_time, '까지'), spanW(1, 3),
           { colspan: 3, align: AlignmentType.CENTER }),
       ]}),
-      // 행선지 | dest | 경유지 | waypoint
       new TableRow({ height: ROW_H, children: [
         cell('행  선  지', C[0], { bold: true }),
         cell(r.destination, C[1], { align: AlignmentType.CENTER }),
         cell('경  유  지', C[2], { bold: true }),
-        cell(r.waypoint ?? '', C[3], { align: AlignmentType.CENTER }),
+        cell(r.waypoint || '-', C[3], { align: AlignmentType.CENTER }),
       ]}),
-      // 용무 | colspan 3
       new TableRow({ height: ROW_H, children: [
         cell('용     무', C[0], { bold: true }),
         cell(r.purpose, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
       ]}),
-      // 사용자 | colspan 3
       new TableRow({ height: ROW_H, children: [
         cell('사  용  자', C[0], { bold: true }),
-        cell(dept, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
+        cell(`${dept}   ${r.driver_name}`, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
       ]}),
     ],
   })
@@ -211,7 +220,7 @@ function approvalTable(r: RecordWithJoins): Table {
         cell('행  선  지', C[0], { bold: true }),
         cell(r.destination, C[1], { align: AlignmentType.CENTER }),
         cell('경  유  지', C[2], { bold: true }),
-        cell(r.waypoint ?? '', C[3], { align: AlignmentType.CENTER }),
+        cell(r.waypoint || '-', C[3], { align: AlignmentType.CENTER }),
       ]}),
       // 용무 | purpose | 운행거리 | km
       new TableRow({ height: ROW_H, children: [
@@ -223,7 +232,7 @@ function approvalTable(r: RecordWithJoins): Table {
       // 사용자 | colspan 3
       new TableRow({ height: ROW_H, children: [
         cell('사  용  자', C[0], { bold: true }),
-        cell(dept, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
+        cell(`${dept}   ${r.driver_name}`, spanW(1, 3), { colspan: 3, align: AlignmentType.CENTER }),
       ]}),
     ],
   })
@@ -256,8 +265,10 @@ function noteBox(text: string): Table {
 
 // ── 각 셀 내부 콘텐츠 ────────────────────────────────────────────────────
 
-function requestContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
+function requestContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const dept = r.departments?.name ?? '산림특용자원연구과'
+  const driver = r.driver_name
+  const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
     gap(MM(6)),
     formTitle('배 차 신 청 서'),
@@ -268,16 +279,17 @@ function requestContent(r: RecordWithJoins, managerName: string): (Paragraph | T
     gap(MM(12)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
     gap(MM(10)),
-    p(`${dept}                   (인)`, AlignmentType.CENTER, FS),
+    p(`${dept}   ${driver}   (인)`, AlignmentType.CENTER, FS),
     gap(MM(6)),
-    p(`${dept}   ${managerName}   귀하`, AlignmentType.CENTER, FS),
+    p(`${ownerDept}   ${approver}   귀하`, AlignmentType.CENTER, FS),
     gap(MM(10)),
     noteBox('※ 적어도 사용하기 1시간 전까지 배차를 요청하여야 합니다.'),
   ]
 }
 
-function approvalContent(r: RecordWithJoins, managerName: string): (Paragraph | Table)[] {
-  const dept = r.departments?.name ?? '산림특용자원연구과'
+function approvalContent(r: RecordWithJoins): (Paragraph | Table)[] {
+  const driver = r.driver_name
+  const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
     gap(MM(6)),
     formTitle('배 차 승 인 서'),
@@ -288,9 +300,9 @@ function approvalContent(r: RecordWithJoins, managerName: string): (Paragraph | 
     gap(MM(12)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
     gap(MM(10)),
-    p(`${dept}   ${managerName}   (인)`, AlignmentType.CENTER, FS),
+    p(`${ownerDept}   ${approver}   (인)`, AlignmentType.CENTER, FS),
     gap(MM(6)),
-    p(`${dept}                   귀하`, AlignmentType.CENTER, FS),
+    p(`${ownerDept}   ${driver}   귀하`, AlignmentType.CENTER, FS),
     gap(MM(10)),
     noteBox('※ 운전원은 운행종료 후 즉시 이 승인서를 반납하여야 합니다.'),
   ]
@@ -298,7 +310,7 @@ function approvalContent(r: RecordWithJoins, managerName: string): (Paragraph | 
 
 // ── 페이지(레코드 1건) ────────────────────────────────────────────────────
 
-function buildPage(r: RecordWithJoins, managerName: string): Table {
+function buildPage(r: RecordWithJoins): Table {
   return new Table({
     width:        { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
     layout:       TableLayoutType.FIXED,
@@ -312,7 +324,7 @@ function buildPage(r: RecordWithJoins, managerName: string): Table {
             borders:       { top: NONE_B, bottom: NONE_B, left: NONE_B, right: DASH_B },
             margins:       { top: 0, bottom: 0, left: 0, right: MM(4) },
             verticalAlign: VerticalAlign.TOP,
-            children:      requestContent(r, managerName),
+            children:      requestContent(r),
           }),
           // 가운데 간격
           new TableCell({
@@ -326,7 +338,7 @@ function buildPage(r: RecordWithJoins, managerName: string): Table {
             borders:       BORDERS_NONE,
             margins:       { top: 0, bottom: 0, left: MM(4), right: 0 },
             verticalAlign: VerticalAlign.TOP,
-            children:      approvalContent(r, managerName),
+            children:      approvalContent(r),
           }),
         ],
       }),
@@ -353,8 +365,7 @@ export async function exportBaechaForms(
         spacing:         { before: 0, after: 0, line: 20, lineRule: 'exact' },
       }))
     }
-    const managerName = r.vehicles ? (VEHICLE_MANAGER_MAP[r.vehicles.name] ?? '') : ''
-    children.push(buildPage(r, managerName))
+    children.push(buildPage(r))
   })
 
   const doc = new Document({
