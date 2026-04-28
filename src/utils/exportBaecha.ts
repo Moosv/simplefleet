@@ -28,11 +28,11 @@ type RecordWithJoins = DrivingRecord & {
 const MM = (v: number) => Math.round(v * 56.6929)
 
 // A4 가로: 물리적 치수를 직접 지정 (297mm × 210mm)
-// 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 12 - 12 = 186mm
+// 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 8 - 8 = 194mm
 const PAGE_W    = MM(297)   // 가로(landscape) 실제 폭
 const PAGE_H    = MM(210)   // 가로(landscape) 실제 높이
 const MARGIN_LR = MM(15)
-const MARGIN_TB = MM(12)
+const MARGIN_TB = MM(8)
 
 // 두 양식 레이아웃: [130mm] [7mm gap] [130mm] = 267mm
 const FORM_W = MM(130)
@@ -41,9 +41,9 @@ const GAP_W  = MM(7)
 // 내부 테이블 컬럼 [33, 50, 27, 20] = 130mm
 const C = [MM(33), MM(50), MM(27), MM(20)] as const
 
-const FS    = 18  // 9pt
-const FS_SM = 16  // 8pt
-const FS_TL = 24  // 12pt (form title)
+const FS    = 16  // 8pt
+const FS_SM = 14  // 7pt
+const FS_TL = 20  // 10pt (form title)
 
 const THIN   = { style: BorderStyle.SINGLE, size: 4,  color: '000000' }
 const NONE_B = { style: BorderStyle.NONE,   size: 0,  color: 'FFFFFF' }
@@ -77,7 +77,7 @@ function gap(twips: number): Paragraph {
 function formTitle(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: MM(4) },
+    spacing: { before: 0, after: MM(2) },
     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
     children: [new TextRun({ text, bold: true, size: FS_TL, font: '맑은 고딕' })],
   })
@@ -143,7 +143,7 @@ function cell(
   })
 }
 
-const ROW_H = { value: MM(7), rule: 'exact' as const }
+const ROW_H = { value: MM(6), rule: 'exact' as const }
 
 // ── 배차신청서 테이블 ─────────────────────────────────────────────────────
 
@@ -271,19 +271,19 @@ function requestContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(5)),
+    gap(MM(3)),
     formTitle('배 차 신 청 서'),
-    gap(MM(4)),
+    gap(MM(2)),
     requestTable(r),
-    gap(MM(7)),
+    gap(MM(4)),
     p('위와 같이 차량의 배차를 요청하오니 승인하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(8)),
+    gap(MM(4)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(7)),
+    gap(MM(4)),
     p(`${dept}   ${driver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(5)),
+    gap(MM(3)),
     p(`${ownerDept}   ${approver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(7)),
+    gap(MM(4)),
     noteBox('※ 적어도 사용하기 1시간 전까지 배차를 요청하여야 합니다.'),
   ]
 }
@@ -292,19 +292,19 @@ function approvalContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(5)),
+    gap(MM(3)),
     formTitle('배 차 승 인 서'),
-    gap(MM(4)),
+    gap(MM(2)),
     approvalTable(r),
-    gap(MM(7)),
+    gap(MM(4)),
     p('이와 같이 배차하오니 안전운행에 유의하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(8)),
+    gap(MM(4)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(7)),
+    gap(MM(4)),
     p(`${ownerDept}   ${approver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(5)),
+    gap(MM(3)),
     p(`${ownerDept}   ${driver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(7)),
+    gap(MM(4)),
     noteBox('※ 운전원은 운행종료 후 즉시 이 승인서를 반납하여야 합니다.'),
   ]
 }
