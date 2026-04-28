@@ -64,20 +64,24 @@ function p(
 ): Paragraph {
   return new Paragraph({
     alignment: align,
-    spacing: { before: spaceBefore, after: spaceAfter },
+    spacing: { before: spaceBefore, after: spaceAfter, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, bold, size, font: '맑은 고딕' })],
   })
 }
 
+// line:20 exact → 단락 자체 높이를 0에 가깝게 만들어 before 값만 여백으로 작동
 function gap(twips: number): Paragraph {
-  return new Paragraph({ spacing: { before: twips, after: 0 }, children: [] })
+  return new Paragraph({
+    spacing: { before: twips, after: 0, line: 20, lineRule: 'exact' as const },
+    children: [],
+  })
 }
 
 // 양식 제목 (하단 테두리로 밑줄 효과)
 function formTitle(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: MM(2) },
+    spacing: { before: 0, after: MM(2), line: 240, lineRule: 'auto' as const },
     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
     children: [new TextRun({ text, bold: true, size: FS_TL, font: '맑은 고딕' })],
   })
@@ -254,7 +258,7 @@ function noteBox(text: string): Table {
             margins: { top: 60, bottom: 60, left: 100, right: 100 },
             children: [new Paragraph({
               alignment: AlignmentType.LEFT,
-              spacing:   { before: 0, after: 0 },
+              spacing:   { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
               children:  [new TextRun({ text, size: FS_SM, font: '맑은 고딕' })],
             })],
           }),
@@ -316,8 +320,10 @@ function buildPage(r: RecordWithJoins): Table {
     width:        { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
     layout:       TableLayoutType.FIXED,
     columnWidths: [FORM_W, GAP_W, FORM_W],
+    borders:      { top: NONE_B, bottom: NONE_B, left: NONE_B, right: NONE_B },
     rows: [
       new TableRow({
+        cantSplit: true,
         children: [
           // 배차신청서 (우측에 dashed border = 가운데 절취선)
           new TableCell({
@@ -331,7 +337,7 @@ function buildPage(r: RecordWithJoins): Table {
           new TableCell({
             width:   { size: GAP_W, type: WidthType.DXA },
             borders: BORDERS_NONE,
-            children:[new Paragraph({ children: [] })],
+            children:[new Paragraph({ spacing: { before: 0, after: 0, line: 20, lineRule: 'exact' as const }, children: [] })],
           }),
           // 배차승인서
           new TableCell({
