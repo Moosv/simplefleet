@@ -320,10 +320,8 @@ function buildPage(r: RecordWithJoins): Table {
     width:        { size: FORM_W * 2 + GAP_W, type: WidthType.DXA },
     layout:       TableLayoutType.FIXED,
     columnWidths: [FORM_W, GAP_W, FORM_W],
-    borders:      { top: NONE_B, bottom: NONE_B, left: NONE_B, right: NONE_B },
     rows: [
       new TableRow({
-        cantSplit: true,
         children: [
           // 배차신청서 (우측에 dashed border = 가운데 절취선)
           new TableCell({
