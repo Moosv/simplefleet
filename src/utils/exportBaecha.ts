@@ -1,7 +1,7 @@
 import {
   Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
   WidthType, AlignmentType, VerticalAlign, BorderStyle,
-  VerticalMergeType, TableLayoutType, PageOrientation,
+  VerticalMergeType, TableLayoutType,
 } from 'docx'
 import type { DrivingRecord } from '@/types'
 
@@ -27,11 +27,10 @@ type RecordWithJoins = DrivingRecord & {
 
 const MM = (v: number) => Math.round(v * 56.6929)
 
-// A4 가로: docx LANDSCAPE 시 width↔height 스왑 → 세로 치수(210×297) 입력
-// 실제 출력: 가로 297mm, 세로 210mm / 좌우 여백 15mm, 상하 여백 20mm
+// A4 가로: 물리적 치수를 직접 지정 (297mm × 210mm)
 // 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 20 - 20 = 170mm
-const PAGE_W    = MM(210)
-const PAGE_H    = MM(297)
+const PAGE_W    = MM(297)   // 가로(landscape) 실제 폭
+const PAGE_H    = MM(210)   // 가로(landscape) 실제 높이
 const MARGIN_LR = MM(15)
 const MARGIN_TB = MM(20)
 
@@ -374,7 +373,7 @@ export async function exportBaechaForms(
     sections: [{
       properties: {
         page: {
-          size:   { width: PAGE_W, height: PAGE_H, orientation: PageOrientation.LANDSCAPE },
+          size:   { width: PAGE_W, height: PAGE_H },
           margin: { top: MARGIN_TB, bottom: MARGIN_TB, left: MARGIN_LR, right: MARGIN_LR },
         },
       },
