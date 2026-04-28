@@ -28,11 +28,11 @@ type RecordWithJoins = DrivingRecord & {
 const MM = (v: number) => Math.round(v * 56.6929)
 
 // A4 가로: 물리적 치수를 직접 지정 (297mm × 210mm)
-// 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 20 - 20 = 170mm
+// 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 12 - 12 = 186mm
 const PAGE_W    = MM(297)   // 가로(landscape) 실제 폭
 const PAGE_H    = MM(210)   // 가로(landscape) 실제 높이
 const MARGIN_LR = MM(15)
-const MARGIN_TB = MM(20)
+const MARGIN_TB = MM(12)
 
 // 두 양식 레이아웃: [130mm] [7mm gap] [130mm] = 267mm
 const FORM_W = MM(130)
@@ -271,19 +271,19 @@ function requestContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(6)),
-    formTitle('배 차 신 청 서'),
     gap(MM(5)),
+    formTitle('배 차 신 청 서'),
+    gap(MM(4)),
     requestTable(r),
-    gap(MM(10)),
+    gap(MM(7)),
     p('위와 같이 차량의 배차를 요청하오니 승인하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(12)),
+    gap(MM(8)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(10)),
+    gap(MM(7)),
     p(`${dept}   ${driver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(6)),
+    gap(MM(5)),
     p(`${ownerDept}   ${approver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(10)),
+    gap(MM(7)),
     noteBox('※ 적어도 사용하기 1시간 전까지 배차를 요청하여야 합니다.'),
   ]
 }
@@ -292,19 +292,19 @@ function approvalContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(6)),
-    formTitle('배 차 승 인 서'),
     gap(MM(5)),
+    formTitle('배 차 승 인 서'),
+    gap(MM(4)),
     approvalTable(r),
-    gap(MM(10)),
+    gap(MM(7)),
     p('이와 같이 배차하오니 안전운행에 유의하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(12)),
+    gap(MM(8)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(10)),
+    gap(MM(7)),
     p(`${ownerDept}   ${approver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(6)),
+    gap(MM(5)),
     p(`${ownerDept}   ${driver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(10)),
+    gap(MM(7)),
     noteBox('※ 운전원은 운행종료 후 즉시 이 승인서를 반납하여야 합니다.'),
   ]
 }
