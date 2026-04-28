@@ -143,7 +143,7 @@ function cell(
   })
 }
 
-const ROW_H = { value: MM(10), rule: 'exact' as const }
+const ROW_H = { value: MM(7), rule: 'exact' as const }
 
 // ── 배차신청서 테이블 ─────────────────────────────────────────────────────
 
