@@ -35,11 +35,14 @@ const MARGIN_LR = MM(15)
 const MARGIN_TB = MM(8)
 
 // 두 양식 레이아웃: [130mm] [7mm gap] [130mm] = 267mm
-const FORM_W = MM(130)
-const GAP_W  = MM(7)
+const FORM_W  = MM(130)
+const GAP_W   = MM(7)
+// buildPage 외부 셀에 left/right margin MM(4)가 있으므로
+// 내부 테이블은 FORM_W - MM(4) = 126mm 로 제한해야 오른쪽 선이 잘리지 않음
+const INNER_W = MM(126)
 
-// 내부 테이블 컬럼 [33, 50, 27, 20] = 130mm
-const C = [MM(33), MM(50), MM(27), MM(20)] as const
+// 내부 테이블 컬럼 [33, 47, 27, 19] = 126mm
+const C = [MM(33), MM(47), MM(27), MM(19)] as const
 
 const FS    = 16  // 8pt
 const FS_SM = 14  // 7pt
@@ -147,7 +150,7 @@ function cell(
   })
 }
 
-const ROW_H = { value: MM(6), rule: 'exact' as const }
+const ROW_H = { value: MM(17), rule: 'exact' as const }
 
 // ── 배차신청서 테이블 ─────────────────────────────────────────────────────
 
@@ -156,7 +159,7 @@ function requestTable(r: RecordWithJoins): Table {
   const endDate = (r.end_date && r.end_date !== r.usage_date) ? r.end_date : r.usage_date
 
   return new Table({
-    width:        { size: FORM_W, type: WidthType.DXA },
+    width:        { size: INNER_W, type: WidthType.DXA },
     layout:       TableLayoutType.FIXED,
     columnWidths: [...C],
     rows: [
@@ -197,7 +200,7 @@ function approvalTable(r: RecordWithJoins): Table {
   const distance = r.distance_traveled != null ? `${r.distance_traveled}km` : ''
 
   return new Table({
-    width:        { size: FORM_W, type: WidthType.DXA },
+    width:        { size: INNER_W, type: WidthType.DXA },
     layout:       TableLayoutType.FIXED,
     columnWidths: [...C],
     rows: [
@@ -247,13 +250,13 @@ function approvalTable(r: RecordWithJoins): Table {
 
 function noteBox(text: string): Table {
   return new Table({
-    width:  { size: FORM_W, type: WidthType.DXA },
+    width:  { size: INNER_W, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     rows: [
       new TableRow({
         children: [
           new TableCell({
-            width:   { size: FORM_W, type: WidthType.DXA },
+            width:   { size: INNER_W, type: WidthType.DXA },
             borders: BORDERS_ALL,
             margins: { top: 60, bottom: 60, left: 100, right: 100 },
             children: [new Paragraph({
@@ -275,19 +278,19 @@ function requestContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(3)),
+    gap(MM(10)),
     formTitle('배 차 신 청 서'),
-    gap(MM(2)),
+    gap(MM(10)),
     requestTable(r),
-    gap(MM(4)),
+    gap(MM(10)),
     p('위와 같이 차량의 배차를 요청하오니 승인하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     p(`${dept}   ${driver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(3)),
+    gap(MM(10)),
     p(`${ownerDept}   ${approver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     noteBox('※ 적어도 사용하기 1시간 전까지 배차를 요청하여야 합니다.'),
   ]
 }
@@ -296,19 +299,19 @@ function approvalContent(r: RecordWithJoins): (Paragraph | Table)[] {
   const driver = r.driver_name
   const { ownerDept, approver } = resolveApprover(r.vehicles?.name, driver)
   return [
-    gap(MM(3)),
+    gap(MM(10)),
     formTitle('배 차 승 인 서'),
-    gap(MM(2)),
+    gap(MM(10)),
     approvalTable(r),
-    gap(MM(4)),
+    gap(MM(10)),
     p('이와 같이 배차하오니 안전운행에 유의하여 주시기 바랍니다.', AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     p(fmtDate(r.usage_date), AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     p(`${ownerDept}   ${approver}   (인)`, AlignmentType.CENTER, FS),
-    gap(MM(3)),
+    gap(MM(10)),
     p(`${ownerDept}   ${driver}   귀하`, AlignmentType.CENTER, FS),
-    gap(MM(4)),
+    gap(MM(10)),
     noteBox('※ 운전원은 운행종료 후 즉시 이 승인서를 반납하여야 합니다.'),
   ]
 }
