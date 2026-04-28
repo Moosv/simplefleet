@@ -1,7 +1,7 @@
 import {
   Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
   WidthType, AlignmentType, VerticalAlign, BorderStyle,
-  VerticalMergeType, TableLayoutType,
+  VerticalMergeType, TableLayoutType, PageOrientation,
 } from 'docx'
 import type { DrivingRecord } from '@/types'
 
@@ -27,18 +27,20 @@ type RecordWithJoins = DrivingRecord & {
 
 const MM = (v: number) => Math.round(v * 56.6929)
 
-// A4 portrait, margins 15mm LR / 20mm TB → usable 180 × 257mm
+// A4 가로: docx LANDSCAPE 시 width↔height 스왑 → 세로 치수(210×297) 입력
+// 실제 출력: 가로 297mm, 세로 210mm / 좌우 여백 15mm, 상하 여백 20mm
+// 가용 폭: 297 - 15 - 15 = 267mm / 가용 높이: 210 - 20 - 20 = 170mm
 const PAGE_W    = MM(210)
 const PAGE_H    = MM(297)
 const MARGIN_LR = MM(15)
 const MARGIN_TB = MM(20)
 
-// 두 양식 레이아웃: [88mm] [4mm gap] [88mm] = 180mm
-const FORM_W = MM(88)
-const GAP_W  = MM(4)
+// 두 양식 레이아웃: [130mm] [7mm gap] [130mm] = 267mm
+const FORM_W = MM(130)
+const GAP_W  = MM(7)
 
-// 내부 테이블 컬럼 [22, 34, 18, 14] = 88mm
-const C = [MM(22), MM(34), MM(18), MM(14)] as const
+// 내부 테이블 컬럼 [33, 50, 27, 20] = 130mm
+const C = [MM(33), MM(50), MM(27), MM(20)] as const
 
 const FS    = 18  // 9pt
 const FS_SM = 16  // 8pt
@@ -372,7 +374,7 @@ export async function exportBaechaForms(
     sections: [{
       properties: {
         page: {
-          size:   { width: PAGE_W, height: PAGE_H },
+          size:   { width: PAGE_W, height: PAGE_H, orientation: PageOrientation.LANDSCAPE },
           margin: { top: MARGIN_TB, bottom: MARGIN_TB, left: MARGIN_LR, right: MARGIN_LR },
         },
       },
