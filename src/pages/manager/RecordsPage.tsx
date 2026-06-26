@@ -627,7 +627,7 @@ export default function ManagerRecordsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            배차신청서/승인서 전체 출력
+            배차신청/승인서 전체 출력
           </button>
         </div>
       </div>
@@ -677,7 +677,7 @@ export default function ManagerRecordsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['사용일자', '출발/도착', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', '전체 내용', '배차신청서'].map(h => (
+                {['사용일자', '출발/도착', '운전자', '용무', '경유지', '목적지', '운행기간', '운행거리', '누적거리', '주유량', '전체 내용', '배차신청/승인서'].map(h => (
                   <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
