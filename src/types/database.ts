@@ -154,6 +154,66 @@ export type Database = {
         }
         Relationships: []
       }
+      dispatch_requests: {
+        Row: {
+          id: string
+          created_at: string
+          department_id: string | null
+          team_id: string | null
+          employee_id: string | null
+          driver_name: string
+          vehicle_id: string | null
+          usage_date: string
+          end_date: string | null
+          departure_time: string | null
+          arrival_time: string | null
+          destination: string
+          waypoint: string | null
+          purpose: string
+          approver_name: string | null
+          status: 'requested' | 'linked' | 'printed' | 'cancelled'
+          driving_record_id: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          department_id?: string | null
+          team_id?: string | null
+          employee_id?: string | null
+          driver_name: string
+          vehicle_id?: string | null
+          usage_date: string
+          end_date?: string | null
+          departure_time?: string | null
+          arrival_time?: string | null
+          destination: string
+          waypoint?: string | null
+          purpose: string
+          approver_name?: string | null
+          status?: 'requested' | 'linked' | 'printed' | 'cancelled'
+          driving_record_id?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          department_id?: string | null
+          team_id?: string | null
+          employee_id?: string | null
+          driver_name?: string
+          vehicle_id?: string | null
+          usage_date?: string
+          end_date?: string | null
+          departure_time?: string | null
+          arrival_time?: string | null
+          destination?: string
+          waypoint?: string | null
+          purpose?: string
+          approver_name?: string | null
+          status?: 'requested' | 'linked' | 'printed' | 'cancelled'
+          driving_record_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -191,6 +251,7 @@ export type Employee = Database['public']['Tables']['employees']['Row']
 export type Purpose = Database['public']['Tables']['purposes']['Row']
 export type AdminProfile = Database['public']['Tables']['admin_profiles']['Row']
 export type DrivingRecord = Database['public']['Tables']['driving_records']['Row']
+export type DispatchRequest = Database['public']['Tables']['dispatch_requests']['Row']
 
 export type AdminRole = AdminProfile['role']
 export type AdminStatus = AdminProfile['status']

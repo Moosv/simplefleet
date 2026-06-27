@@ -6,14 +6,13 @@ import {
 import type { DrivingRecord } from '@/types'
 
 // 차량별 담당자 우선순위 (높은 순서대로, 운전자와 겹치면 다음 사람으로)
-const VEHICLE_APPROVERS: Record<string, { ownerDept: string; priority: string[] }> = {
+export const VEHICLE_APPROVERS: Record<string, { ownerDept: string; priority: string[] }> = {
   '숲푸드트럭':   { ownerDept: '산림특용자원연구과', priority: ['권순호', '김철우', '황병현'] },
   '스마트달구지': { ownerDept: '산림특용자원연구과', priority: ['한진규', '어현지', '김문섭'] },
   '꿀벌붕붕카':  { ownerDept: '산림특용자원연구과', priority: ['김현준', '나성준'] },
-  '꿀벌 붕붕카': { ownerDept: '산림특용자원연구과', priority: ['김현준', '나성준'] },
 }
 
-function resolveApprover(vehicleName: string | undefined, driverName: string) {
+export function resolveApprover(vehicleName: string | undefined, driverName: string) {
   const cfg = vehicleName ? VEHICLE_APPROVERS[vehicleName] : undefined
   const ownerDept = cfg?.ownerDept ?? '산림특용자원연구과'
   const approver  = cfg?.priority.find(n => n !== driverName) ?? cfg?.priority[0] ?? ''
@@ -37,12 +36,11 @@ const MARGIN_TB = MM(8)
 // 두 양식 레이아웃: [130mm] [7mm gap] [130mm] = 267mm
 const FORM_W  = MM(130)
 const GAP_W   = MM(7)
-// buildPage 외부 셀에 left/right margin MM(4)가 있으므로
-// 내부 테이블은 FORM_W - MM(4) = 126mm 로 제한해야 오른쪽 선이 잘리지 않음
-const INNER_W = MM(126)
+// buildPage 외부 셀 margin MM(4) + 여유 MM(4) = 총 MM(8) 확보 → 오른쪽 선 잘림/넘침 방지
+const INNER_W = MM(122)
 
-// 내부 테이블 컬럼 [33, 47, 27, 19] = 126mm
-const C = [MM(33), MM(47), MM(27), MM(19)] as const
+// 내부 테이블 컬럼 [31, 45, 27, 19] = 122mm
+const C = [MM(31), MM(45), MM(27), MM(19)] as const
 
 const FS    = 16  // 8pt
 const FS_SM = 14  // 7pt
@@ -80,13 +78,24 @@ function gap(twips: number): Paragraph {
   })
 }
 
-// 양식 제목 (하단 테두리로 밑줄 효과)
-function formTitle(text: string): Paragraph {
-  return new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: MM(2), line: 240, lineRule: 'auto' as const },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 4 } },
-    children: [new TextRun({ text, bold: true, size: FS_TL, font: '맑은 고딕' })],
+// 양식 제목 (테이블 bottom border로 밑줄 — 양쪽 셀 모두 확실하게 표시)
+function formTitle(text: string): Table {
+  return new Table({
+    width:        { size: INNER_W, type: WidthType.DXA },
+    layout:       TableLayoutType.FIXED,
+    columnWidths: [INNER_W],
+    rows: [new TableRow({
+      children: [new TableCell({
+        width:   { size: INNER_W, type: WidthType.DXA },
+        borders: { top: NONE_B, bottom: THIN, left: NONE_B, right: NONE_B },
+        margins: { top: 0, bottom: MM(2), left: 80, right: 80 },
+        children: [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing:   { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
+          children:  [new TextRun({ text, bold: true, size: FS_TL, font: '맑은 고딕' })],
+        })],
+      })],
+    })],
   })
 }
 
@@ -150,7 +159,7 @@ function cell(
   })
 }
 
-const ROW_H = { value: MM(17), rule: 'exact' as const }
+const ROW_H = { value: MM(13), rule: 'exact' as const }
 
 // ── 배차신청서 테이블 ─────────────────────────────────────────────────────
 
@@ -250,8 +259,9 @@ function approvalTable(r: RecordWithJoins): Table {
 
 function noteBox(text: string): Table {
   return new Table({
-    width:  { size: INNER_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
+    width:        { size: INNER_W, type: WidthType.DXA },
+    layout:       TableLayoutType.FIXED,
+    columnWidths: [INNER_W],
     rows: [
       new TableRow({
         children: [
@@ -356,14 +366,8 @@ function buildPage(r: RecordWithJoins): Table {
 
 // ── 공개 API ─────────────────────────────────────────────────────────────
 
-export async function exportBaechaForms(
-  records: RecordWithJoins[],
-  opts: { filename?: string } = {},
-): Promise<void> {
-  if (records.length === 0) return
-
-  const sorted = [...records].sort((a, b) => a.usage_date.localeCompare(b.usage_date))
-
+// 정렬된 레코드들을 한 docx로 묶어 다운로드 (레코드 1건 = 1페이지)
+async function packAndDownload(sorted: RecordWithJoins[], filename: string): Promise<void> {
   const children: (Table | Paragraph)[] = []
   sorted.forEach((r, i) => {
     if (i > 0) {
@@ -392,9 +396,36 @@ export async function exportBaechaForms(
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `${opts.filename ?? `배차신청서_${new Date().toISOString().split('T')[0]}`}.docx`
+  a.download = `${filename}.docx`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+const todayTag = () => new Date().toISOString().split('T')[0]
+
+// 운행기록 기반 출력 (사용일자순)
+export async function exportBaechaForms(
+  records: RecordWithJoins[],
+  opts: { filename?: string } = {},
+): Promise<void> {
+  if (records.length === 0) return
+  const sorted = [...records].sort((a, b) => a.usage_date.localeCompare(b.usage_date))
+  await packAndDownload(sorted, opts.filename ?? `배차신청서_${todayTag()}`)
+}
+
+// 배차신청 기반 출력 (차량별 → 사용일자순으로 정렬해 각 차량이 순차적으로 나오게)
+export async function exportDispatchForms(
+  requests: RecordWithJoins[],
+  opts: { filename?: string } = {},
+): Promise<void> {
+  if (requests.length === 0) return
+  const sorted = [...requests].sort((a, b) => {
+    const va = a.vehicles?.name ?? ''
+    const vb = b.vehicles?.name ?? ''
+    if (va !== vb) return va.localeCompare(vb, 'ko')
+    return a.usage_date.localeCompare(b.usage_date)
+  })
+  await packAndDownload(sorted, opts.filename ?? `배차신청서_${todayTag()}`)
 }

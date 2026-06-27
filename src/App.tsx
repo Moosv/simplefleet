@@ -9,6 +9,8 @@ import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import RecordEntryPage from '@/pages/RecordEntryPage'
 import EmployeeLoginPage from '@/pages/EmployeeLoginPage'
+import DispatchRequestPage from '@/pages/DispatchRequestPage'
+import DispatchManagePage from '@/pages/DispatchManagePage'
 import EmployeeDashboardPage from '@/pages/EmployeeDashboardPage'
 import VehicleDashboardPage from '@/pages/VehicleDashboardPage'
 import DepartmentDashboardPage from '@/pages/DepartmentDashboardPage'
@@ -54,6 +56,10 @@ const OPERATOR_NAV = [
     icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
   },
   {
+    to: '/operator/dispatch', label: '배차신청',
+    icon: <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+  },
+  {
     to: '/operator/stats', label: '통계',
     icon: <Icon d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />,
   },
@@ -79,6 +85,10 @@ const MANAGER_NAV = [
   {
     to: '/manager/records', label: '운행 기록',
     icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
+  },
+  {
+    to: '/manager/dispatch', label: '배차신청',
+    icon: <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
   },
   {
     to: '/manager/stats', label: '통계',
@@ -142,6 +152,7 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/record" element={<RecordEntryPage />} />
             <Route path="/employee" element={<EmployeeLoginPage />} />
+            <Route path="/employee/dispatch" element={<DispatchRequestPage />} />
             <Route path="/employee/record" element={<RecordEntryPage />} />
             <Route path="/employee/dashboard" element={<EmployeeDashboardPage />} />
             <Route path="/vehicle/dashboard" element={<VehicleDashboardPage />} />
@@ -150,6 +161,7 @@ export default function App() {
             {/* 시스템운영자 라우트 */}
             <Route path="/operator/dashboard" element={<OperatorPage><OperatorDashboardPage /></OperatorPage>} />
             <Route path="/operator/records" element={<OperatorPage><OperatorRecordsPage /></OperatorPage>} />
+            <Route path="/operator/dispatch" element={<OperatorPage><DispatchManagePage /></OperatorPage>} />
             <Route path="/operator/stats" element={<OperatorPage><OperatorStatsPage /></OperatorPage>} />
             <Route path="/operator/users" element={<OperatorPage><OperatorUsersPage /></OperatorPage>} />
             <Route path="/operator/vehicles" element={<OperatorPage><OperatorVehiclesPage /></OperatorPage>} />
@@ -158,6 +170,7 @@ export default function App() {
             {/* 관리자 라우트 */}
             <Route path="/manager/dashboard" element={<ManagerPage><ManagerDashboardPage /></ManagerPage>} />
             <Route path="/manager/records" element={<ManagerPage><ManagerRecordsPage /></ManagerPage>} />
+            <Route path="/manager/dispatch" element={<ManagerPage><DispatchManagePage /></ManagerPage>} />
             <Route path="/manager/stats" element={<ManagerPage><ManagerStatsPage /></ManagerPage>} />
             <Route path="/manager/users" element={<ManagerPage><ManagerUsersPage /></ManagerPage>} />
             <Route path="/manager/vehicles" element={<ManagerPage><ManagerVehiclesPage /></ManagerPage>} />
